@@ -44,6 +44,28 @@ def ingest(
     force: Annotated[
         bool, typer.Option(help="Force reprocessing even if files are up-to-date")
     ] = False,
+    pipeline: Annotated[
+        Optional[str],
+        typer.Option("--pipeline", help="Docling pipeline: 'standard' or 'vlm'"),
+    ] = None,
+    model: Annotated[
+        Optional[str],
+        typer.Option("--model", help="Docling model to use (specific to pipeline)"),
+    ] = None,
+    device: Annotated[
+        Optional[str],
+        typer.Option(
+            "--device", help="Device for docling: 'auto', 'cpu', 'cuda', 'mps'"
+        ),
+    ] = None,
+    batch_size: Annotated[
+        Optional[int],
+        typer.Option("--batch-size", help="Docling batch size (per worker)"),
+    ] = None,
+    workers: Annotated[
+        Optional[int],
+        typer.Option("--workers", help="Number of parallel workers"),
+    ] = None,
 ) -> None:
     """Ingest files using docling to create JSON documents in docs2db_content/ directory."""
     if source_path is None:
@@ -53,7 +75,16 @@ def ingest(
         raise typer.Exit(1)
 
     try:
-        if not ingest_command(source_path=source_path, dry_run=dry_run, force=force):
+        if not ingest_command(
+            source_path=source_path,
+            dry_run=dry_run,
+            force=force,
+            pipeline=pipeline,
+            model=model,
+            device=device,
+            batch_size=batch_size,
+            workers=workers,
+        ):
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
@@ -101,6 +132,14 @@ def chunk(
             help="IBM WatsonX API URL (requires WATSONX_API_KEY and WATSONX_PROJECT_ID env vars)"
         ),
     ] = None,
+    openrouter_url: Annotated[
+        str | None,
+        typer.Option(help="OpenRouter API URL (requires OPENROUTER_API_KEY env var)"),
+    ] = None,
+    mistral_url: Annotated[
+        str | None,
+        typer.Option(help="Mistral API URL (requires MISTRAL_API_KEY env var)"),
+    ] = None,
     context_limit: Annotated[
         int | None,
         typer.Option(
@@ -120,6 +159,8 @@ def chunk(
             provider=llm_provider,
             openai_url=openai_url,
             watsonx_url=watsonx_url,
+            openrouter_url=openrouter_url,
+            mistral_url=mistral_url,
             context_limit_override=context_limit,
         ):
             raise typer.Exit(1)
@@ -149,12 +190,6 @@ def embed(
     dry_run: Annotated[
         bool, typer.Option(help="Show what would process without doing it")
     ] = False,
-    workers: Annotated[
-        int | None,
-        typer.Option(
-            help="Max worker processes (1 = single-threaded, avoids fork issues on ARM)"
-        ),
-    ] = None,
 ) -> None:
     """Generate embeddings for chunked content files."""
     try:
@@ -164,7 +199,6 @@ def embed(
             pattern=pattern,
             force=force,
             dry_run=dry_run,
-            max_workers=workers,
         ):
             raise typer.Exit(1)
     except Docs2DBException as e:
@@ -600,6 +634,9 @@ def pipeline(
     content_dir: Annotated[
         str | None, typer.Option(help="Content directory for intermediate files")
     ] = None,
+    force: Annotated[
+        bool, typer.Option(help="Force reprocessing even if files are up-to-date")
+    ] = False,
     model: Annotated[str | None, typer.Option(help="Embedding model to use")] = None,
     skip_context: Annotated[
         bool, typer.Option(help="Skip LLM contextual chunk generation (faster)")
@@ -610,7 +647,7 @@ def pipeline(
     llm_provider: Annotated[
         str | None,
         typer.Option(
-            help="LLM provider to use: 'openai' or 'watsonx' (inferred from URL flags if not specified)"
+            help="LLM provider to use: 'openai', 'watsonx', 'openrouter', or 'mistral' (inferred from URL flags if not specified)"
         ),
     ] = None,
     openai_url: Annotated[
@@ -625,11 +662,41 @@ def pipeline(
             help="IBM WatsonX API URL (requires WATSONX_API_KEY and WATSONX_PROJECT_ID env vars)"
         ),
     ] = None,
+    openrouter_url: Annotated[
+        str | None,
+        typer.Option(help="OpenRouter API URL (requires OPENROUTER_API_KEY env var)"),
+    ] = None,
+    mistral_url: Annotated[
+        str | None,
+        typer.Option(help="Mistral API URL (requires MISTRAL_API_KEY env var)"),
+    ] = None,
     context_limit: Annotated[
         int | None,
         typer.Option(
             help="Override model context limit (in tokens) for map-reduce summarization"
         ),
+    ] = None,
+    pipeline: Annotated[
+        Optional[str],
+        typer.Option("--pipeline", help="Docling pipeline: 'standard' or 'vlm'"),
+    ] = None,
+    docling_model: Annotated[
+        Optional[str],
+        typer.Option("--docling-model", help="Docling model to use (for ingestion)"),
+    ] = None,
+    device: Annotated[
+        Optional[str],
+        typer.Option(
+            "--device", help="Device for docling: 'auto', 'cpu', 'cuda', 'mps'"
+        ),
+    ] = None,
+    batch_size: Annotated[
+        Optional[int],
+        typer.Option("--batch-size", help="Docling batch size (per worker)"),
+    ] = None,
+    workers: Annotated[
+        Optional[int],
+        typer.Option("--workers", help="Number of parallel workers"),
     ] = None,
     output_file: Annotated[
         str, typer.Option(help="Output SQL dump file")
@@ -686,7 +753,16 @@ def pipeline(
 
         # Step 2: Ingest
         logger.info("[2/7] Ingesting documents...")
-        if not ingest_command(source_path=source_path, dry_run=False, force=False):
+        if not ingest_command(
+            source_path=source_path,
+            dry_run=False,
+            force=force,
+            pipeline=pipeline,
+            model=docling_model,
+            device=device,
+            batch_size=batch_size,
+            workers=workers,
+        ):
             raise Docs2DBException("Failed to ingest documents")
 
         # Step 3: Chunk
@@ -701,6 +777,8 @@ def pipeline(
             provider=llm_provider,
             openai_url=openai_url,
             watsonx_url=watsonx_url,
+            openrouter_url=openrouter_url,
+            mistral_url=mistral_url,
             context_limit_override=context_limit,
         ):
             raise Docs2DBException("Failed to generate chunks")

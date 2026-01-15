@@ -249,7 +249,7 @@ class OpenAICompatibleProvider(LLMProvider):
         self.model = model
         # Initialize with placeholder messages; will be replaced by set_doc_text()
         self.messages = [{"role": "system", "content": "Initializing..."}]
-        self.client = httpx.Client(timeout=60.0)
+        self.client = httpx.Client(timeout=600.0)
 
     def get_chunk_context(self, chunk_prompt: str) -> str:
         """Get context for a chunk using OpenAI-compatible API."""
@@ -446,6 +446,260 @@ Summary:"""
         pass
 
 
+class OpenRouterProvider(LLMProvider):
+    """Provider for OpenRouter multi-model gateway.
+
+    OpenRouter provides access to 100+ models from various providers including
+    OpenAI, Anthropic, Google, Meta, Mistral through a single API.
+    Uses OpenAI-compatible chat completions format.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        api_key: str,
+        site_url: str | None = None,
+        app_name: str = "Docs2DB",
+    ):
+        """Initialize OpenRouter provider.
+
+        Args:
+            base_url: Base URL for OpenRouter API (usually https://openrouter.ai/api)
+            model: Model identifier (e.g., anthropic/claude-3.5-sonnet)
+            api_key: OpenRouter API key
+            site_url: Optional site URL for OpenRouter rankings
+            app_name: Optional app name for OpenRouter rankings
+        """
+        if not api_key:
+            raise ValueError(
+                "OpenRouter API key required. "
+                "Set OPENROUTER_API_KEY environment variable or get one at openrouter.ai"
+            )
+
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.api_key = api_key
+        self.site_url = site_url
+        self.app_name = app_name
+        # Initialize with placeholder messages; will be replaced by set_doc_text()
+        self.messages = [{"role": "system", "content": "Initializing..."}]
+        self.client = httpx.Client(timeout=600.0)
+
+    def get_chunk_context(self, chunk_prompt: str) -> str:
+        """Get context for a chunk using OpenRouter API."""
+        # Create messages for this request (includes conversation history)
+        request_messages = self.messages + [{"role": "user", "content": chunk_prompt}]
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        # Add optional OpenRouter-specific headers for rankings
+        if self.site_url:
+            headers["HTTP-Referer"] = self.site_url
+        if self.app_name:
+            headers["X-Title"] = self.app_name
+
+        response = self.client.post(
+            f"{self.base_url}/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": self.model,
+                "messages": request_messages,
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 200,
+            },
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result["choices"][0]["message"]["content"].strip()
+
+    def summarize_text(self, text: str) -> str:
+        """Summarize text using OpenRouter API."""
+        prompt = f"""Please provide a concise summary of the following text, focusing on the key information and main topics:
+
+{text}
+
+Summary:"""
+
+        # Log what we're about to send
+        word_count = len(prompt.split())
+        estimated_tokens = estimate_tokens(prompt)
+        char_count = len(prompt)
+        logger.info(
+            f"Sending OpenRouter summarization request: {word_count} words, "
+            f"{estimated_tokens} estimated tokens, {char_count} chars "
+            f"(model: {self.model})"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        if self.site_url:
+            headers["HTTP-Referer"] = self.site_url
+        if self.app_name:
+            headers["X-Title"] = self.app_name
+
+        response = self.client.post(
+            f"{self.base_url}/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 500,
+            },
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result["choices"][0]["message"]["content"].strip()
+
+    def set_doc_text(self, doc_text: str):
+        """Update the document text in the conversation messages.
+
+        Args:
+            doc_text: New document text for context
+        """
+        self.messages = [
+            {
+                "role": "system",
+                "content": "You are an expert at providing concise context for text chunks within documents.",
+            },
+            {
+                "role": "user",
+                "content": f"I will give you a document, then ask you to provide context for specific chunks from it.\n\n<document>\n{doc_text}\n</document>",
+            },
+            {
+                "role": "assistant",
+                "content": "I have read the document. Please provide the chunks you'd like me to contextualize.",
+            },
+        ]
+
+    def close(self):
+        """Close the HTTP client."""
+        self.client.close()
+
+
+class MistralProvider(LLMProvider):
+    """Provider for Mistral AI.
+
+    Supports Mistral's API for text generation using models like
+    Mistral Large, Mistral Small, and vision models like Pixtral.
+    Uses OpenAI-compatible chat completions format.
+    """
+
+    def __init__(self, base_url: str, model: str, api_key: str):
+        """Initialize Mistral provider.
+
+        Args:
+            base_url: Base URL for Mistral API (usually https://api.mistral.ai/v1)
+            model: Model identifier (e.g., mistral-large-latest, pixtral-12b-2409)
+            api_key: Mistral API key
+        """
+        if not api_key:
+            raise ValueError(
+                "Mistral API key required. "
+                "Set MISTRAL_API_KEY environment variable or get one at console.mistral.ai"
+            )
+
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.api_key = api_key
+        # Initialize with placeholder messages; will be replaced by set_doc_text()
+        self.messages = [{"role": "system", "content": "Initializing..."}]
+        self.client = httpx.Client(timeout=600.0)
+
+    def get_chunk_context(self, chunk_prompt: str) -> str:
+        """Get context for a chunk using Mistral API."""
+        # Create messages for this request (includes conversation history)
+        request_messages = self.messages + [{"role": "user", "content": chunk_prompt}]
+
+        response = self.client.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.model,
+                "messages": request_messages,
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 200,
+            },
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result["choices"][0]["message"]["content"].strip()
+
+    def summarize_text(self, text: str) -> str:
+        """Summarize text using Mistral API."""
+        prompt = f"""Please provide a concise summary of the following text, focusing on the key information and main topics:
+
+{text}
+
+Summary:"""
+
+        # Log what we're about to send
+        word_count = len(prompt.split())
+        estimated_tokens = estimate_tokens(prompt)
+        char_count = len(prompt)
+        logger.info(
+            f"Sending Mistral summarization request: {word_count} words, "
+            f"{estimated_tokens} estimated tokens, {char_count} chars "
+            f"(model: {self.model})"
+        )
+
+        response = self.client.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 500,
+            },
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result["choices"][0]["message"]["content"].strip()
+
+    def set_doc_text(self, doc_text: str):
+        """Update the document text in the conversation messages.
+
+        Args:
+            doc_text: New document text for context
+        """
+        self.messages = [
+            {
+                "role": "system",
+                "content": "You are an expert at providing concise context for text chunks within documents.",
+            },
+            {
+                "role": "user",
+                "content": f"I will give you a document, then ask you to provide context for specific chunks from it.\n\n<document>\n{doc_text}\n</document>",
+            },
+            {
+                "role": "assistant",
+                "content": "I have read the document. Please provide the chunks you'd like me to contextualize.",
+            },
+        ]
+
+    def close(self):
+        """Close the HTTP client."""
+        self.client.close()
+
+
 def map_reduce_summarize(
     provider: LLMProvider, text: str, max_tokens: int, model: str
 ) -> str:
@@ -517,6 +771,8 @@ class LLMSession:
         provider: str | None = None,
         openai_url: str | None = None,
         watsonx_url: str | None = None,
+        openrouter_url: str | None = None,
+        mistral_url: str | None = None,
         context_limit_override: int | None = None,
     ):
         """Initialize LLM session (creates API client only, no document yet).
@@ -525,9 +781,11 @@ class LLMSession:
 
         Args:
             model: Model identifier
-            provider: Provider to use ("openai" or "watsonx"); must not be None
+            provider: Provider to use ("openai", "watsonx", "openrouter", or "mistral"); must not be None
             openai_url: OpenAI-compatible API URL (required if provider is "openai")
             watsonx_url: WatsonX API URL (required if provider is "watsonx")
+            openrouter_url: OpenRouter API URL (required if provider is "openrouter")
+            mistral_url: Mistral API URL (required if provider is "mistral")
             context_limit_override: Override model context limit (in tokens)
 
         Raises:
@@ -539,6 +797,8 @@ class LLMSession:
         self.model = model
         self.openai_url = openai_url
         self.watsonx_url = watsonx_url
+        self.openrouter_url = openrouter_url
+        self.mistral_url = mistral_url
         self.context_limit_override = context_limit_override
         self.doc_text = ""
         self._was_summarized = False  # Track if current document was summarized
@@ -580,10 +840,52 @@ class LLMSession:
                 base_url=self.openai_url,
                 model=self.model,
             )
+        elif provider == "openrouter":
+            # Use OpenRouter provider
+            if not self.openrouter_url:
+                raise ValueError(
+                    "provider is 'openrouter' but openrouter_url is None. "
+                    "OpenRouter API URL is required."
+                )
+
+            api_key = settings.openrouter_api_key
+
+            if not api_key:
+                raise ValueError(
+                    "OPENROUTER_API_KEY must be set (via env var or .env file)"
+                )
+
+            self.provider = OpenRouterProvider(
+                base_url=self.openrouter_url,
+                model=self.model,
+                api_key=api_key,
+                site_url=None,  # Optional: can be set via env var
+                app_name="Docs2DB",
+            )
+        elif provider == "mistral":
+            # Use Mistral provider
+            if not self.mistral_url:
+                raise ValueError(
+                    "provider is 'mistral' but mistral_url is None. "
+                    "Mistral API URL is required."
+                )
+
+            api_key = settings.mistral_api_key
+
+            if not api_key:
+                raise ValueError(
+                    "MISTRAL_API_KEY must be set (via env var or .env file)"
+                )
+
+            self.provider = MistralProvider(
+                base_url=self.mistral_url,
+                model=self.model,
+                api_key=api_key,
+            )
         else:
             raise ValueError(
                 f"Unknown provider: '{provider}'. "
-                "Valid options are 'openai' or 'watsonx'."
+                "Valid options are 'openai', 'watsonx', 'openrouter', or 'mistral'."
             )
 
     def set_document(self, doc_text: str):
@@ -655,6 +957,8 @@ def generate_chunks_for_document(
     context_model: str = "qwen2.5:7b-instruct",
     openai_url: str | None = None,
     watsonx_url: str | None = None,
+    openrouter_url: str | None = None,
+    mistral_url: str | None = None,
     context_limit_override: int | None = None,
     llm_session: LLMSession | None = None,
 ) -> Path:
@@ -668,6 +972,8 @@ def generate_chunks_for_document(
         context_model: LLM model for contextual enrichment
         openai_url: OpenAI-compatible API URL
         watsonx_url: WatsonX API URL
+        openrouter_url: OpenRouter API URL
+        mistral_url: Mistral API URL
         context_limit_override: Override model context limit
         llm_session: Pre-initialized LLM session to reuse (avoids creating new API clients)
 
@@ -736,6 +1042,12 @@ def generate_chunks_for_document(
         if watsonx_url:
             enrichment_metadata["provider"] = "watsonx"
             enrichment_metadata["endpoint"] = watsonx_url
+        elif openrouter_url:
+            enrichment_metadata["provider"] = "openrouter"
+            enrichment_metadata["endpoint"] = openrouter_url
+        elif mistral_url:
+            enrichment_metadata["provider"] = "mistral"
+            enrichment_metadata["endpoint"] = mistral_url
         elif openai_url:
             enrichment_metadata["provider"] = "openai_compatible"
             enrichment_metadata["endpoint"] = openai_url
@@ -785,6 +1097,8 @@ def generate_chunks_batch(
     provider: str | None = None,
     openai_url: str | None = None,
     watsonx_url: str | None = None,
+    openrouter_url: str | None = None,
+    mistral_url: str | None = None,
     context_limit_override: int | None = None,
 ) -> dict[str, Any]:
     """Worker function for generating chunks files by the batch.
@@ -794,9 +1108,11 @@ def generate_chunks_batch(
         force: If True, reprocess files even if chunks are up-to-date
         skip_context: If True, skip LLM contextual chunk generation
         context_model: LLM model for context generation
-        provider: LLM provider ("openai" or "watsonx"); must not be None if skip_context is False
+        provider: LLM provider ("openai", "watsonx", "openrouter", or "mistral"); must not be None if skip_context is False
         openai_url: OpenAI-compatible API URL
         watsonx_url: WatsonX API URL
+        openrouter_url: OpenRouter API URL
+        mistral_url: Mistral API URL
         context_limit_override: Override model context limit (in tokens)
 
     Returns:
@@ -866,13 +1182,16 @@ def generate_chunks_batch(
             try:
                 logger.debug(
                     f"Creating LLM session: provider={provider}, model={context_model}, "
-                    f"watsonx_url={watsonx_url}, openai_url={openai_url}"
+                    f"watsonx_url={watsonx_url}, openai_url={openai_url}, "
+                    f"openrouter_url={openrouter_url}, mistral_url={mistral_url}"
                 )
                 reusable_llm_session = LLMSession(
                     model=context_model,
                     provider=provider,
                     openai_url=openai_url,
                     watsonx_url=watsonx_url,
+                    openrouter_url=openrouter_url,
+                    mistral_url=mistral_url,
                     context_limit_override=context_limit_override,
                 )
             except Exception as e:
@@ -912,6 +1231,8 @@ def generate_chunks_batch(
                     context_model=context_model,
                     openai_url=openai_url,
                     watsonx_url=watsonx_url,
+                    openrouter_url=openrouter_url,
+                    mistral_url=mistral_url,
                     context_limit_override=context_limit_override,
                     llm_session=reusable_llm_session,
                 )
@@ -952,6 +1273,8 @@ def generate_chunks(
     provider: str | None = None,
     openai_url: str | None = None,
     watsonx_url: str | None = None,
+    openrouter_url: str | None = None,
+    mistral_url: str | None = None,
     context_limit_override: int | None = None,
 ) -> bool:
     """Generate .chunks.json files from source files using multiprocessing.
@@ -965,9 +1288,11 @@ def generate_chunks(
         dry_run: Show what would be processed without doing it.
         skip_context: Skip LLM contextual chunk generation (defaults to settings.llm_skip_context).
         context_model: LLM model for context generation (defaults to settings.llm_context_model).
-        provider: LLM provider ("openai" or "watsonx"); inferred from URLs or defaults to settings.llm_provider.
+        provider: LLM provider ("openai", "watsonx", "openrouter", or "mistral"); inferred from URLs or defaults to settings.llm_provider.
         openai_url: OpenAI-compatible API URL (defaults to settings.llm_openai_url).
         watsonx_url: WatsonX API URL (defaults to settings.llm_watsonx_url).
+        openrouter_url: OpenRouter API URL (defaults to settings.llm_openrouter_url).
+        mistral_url: Mistral API URL (defaults to settings.llm_mistral_url).
         context_limit_override: Override model context limit in tokens (defaults to settings.llm_context_limit_override).
 
     Returns:
@@ -1047,6 +1372,8 @@ def generate_chunks(
             provider,
             openai_url,
             watsonx_url,
+            openrouter_url,
+            mistral_url,
             context_limit_override,
         ),
         progress_message="Chunking files...",

@@ -13,8 +13,6 @@ from typing import Any, Iterator
 
 import psutil
 import structlog
-from docling.document_converter import DocumentConverter
-from docling_core.types.io import DocumentStream
 
 from docs2db.config import settings
 from docs2db.const import METADATA_SCHEMA_VERSION
@@ -45,7 +43,8 @@ def _suppress_docling_logging() -> None:
 
 
 # Module-level singleton converter for efficiency
-_converter: DocumentConverter | None = None
+_converter: Any | None = None
+_last_converter_settings: tuple | None = None
 
 # README content for the content directory
 _CONTENT_DIR_README = """# About this folder
@@ -81,16 +80,95 @@ the Docling JSON format plus associated processing artifacts.
 """
 
 
-def _get_converter() -> DocumentConverter:
+def _get_converter() -> Any:
     """Get or create the DocumentConverter singleton.
 
     Returns:
         DocumentConverter: The shared converter instance
     """
-    global _converter
-    if _converter is None:
-        _suppress_docling_logging()
-        _converter = DocumentConverter()
+    global _converter, _last_converter_settings
+
+    current_settings = (
+        settings.docling_pipeline,
+        settings.docling_model,
+        settings.docling_device,
+        settings.docling_batch_size,
+    )
+
+    if _converter is not None and _last_converter_settings == current_settings:
+        return _converter
+
+    _suppress_docling_logging()
+
+    # Imports inside to avoid slowing down other parts of the system if not used
+    from docling.datamodel.accelerator_options import AcceleratorDevice
+    from docling.datamodel.base_models import InputFormat
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+    # Map device string to AcceleratorDevice
+    device_map = {
+        "auto": AcceleratorDevice.AUTO,
+        "cpu": AcceleratorDevice.CPU,
+        "cuda": AcceleratorDevice.CUDA,
+        "mps": AcceleratorDevice.MPS,
+    }
+    acc_device = device_map.get(settings.docling_device.lower(), AcceleratorDevice.AUTO)
+
+    if settings.docling_pipeline.lower() == "vlm":
+        from docling.datamodel import vlm_model_specs
+        from docling.datamodel.pipeline_options import VlmPipelineOptions
+        from docling.pipeline.vlm_pipeline import VlmPipeline
+
+        # Configure VLM options
+        vlm_options = None
+        if settings.docling_model:
+            # Check if it's a known spec name
+            spec_name = settings.docling_model.upper()
+            if hasattr(vlm_model_specs, spec_name):
+                vlm_options = getattr(vlm_model_specs, spec_name)
+            else:
+                logger.warning(
+                    f"Unknown VLM model spec: {settings.docling_model}. Using default."
+                )
+
+        vlm_pipeline_options = VlmPipelineOptions(device=acc_device)
+        if vlm_options:
+            vlm_pipeline_options.vlm_options = vlm_options
+
+        format_options = {
+            InputFormat.PDF: PdfFormatOption(
+                pipeline_cls=VlmPipeline,
+                pipeline_options=vlm_pipeline_options,
+            )
+        }
+        logger.info(
+            "Initialized DocumentConverter with VLM pipeline",
+            model=settings.docling_model or "default",
+            device=settings.docling_device,
+        )
+    else:
+        # Standard pipeline
+        pdf_pipeline_options = PdfPipelineOptions()
+        pdf_pipeline_options.accelerator_options.device = acc_device
+
+        # Set specific batch sizes
+        pdf_pipeline_options.ocr_batch_size = settings.docling_batch_size
+        pdf_pipeline_options.layout_batch_size = settings.docling_batch_size
+        pdf_pipeline_options.table_batch_size = settings.docling_batch_size
+
+        format_options = {
+            InputFormat.PDF: PdfFormatOption(
+                pipeline_options=pdf_pipeline_options,
+            )
+        }
+        logger.info(
+            "Initialized DocumentConverter with Standard pipeline",
+            device=settings.docling_device,
+        )
+
+    _converter = DocumentConverter(format_options=format_options)
+    _last_converter_settings = current_settings
     return _converter
 
 
@@ -142,18 +220,39 @@ def is_ingestion_stale(content_file: Path, source_file: Path) -> bool:
         return True
 
 
-def ingest_batch(source_files: list[str], source_root: str, force: bool) -> dict:
+def ingest_batch(
+    source_files: list[str],
+    source_root: str,
+    force: bool,
+    pipeline: str | None = None,
+    model: str | None = None,
+    device: str | None = None,
+    batch_size: int | None = None,
+) -> dict:
     """Worker function to ingest a batch of files.
 
     Args:
         source_files: List of source file paths (as strings)
         source_root: Root directory path (as string)
         force: Whether to force reprocessing
+        pipeline: Docling pipeline to use
+        model: Docling model to use
+        device: Device to use for docling
 
     Returns:
         dict: Results with successes, errors, error_data, last_file, memory, worker_logs
     """
     log_collector = setup_worker_logging(__name__)
+
+    # Update local process settings
+    if pipeline:
+        settings.docling_pipeline = pipeline
+    if model:
+        settings.docling_model = model
+    if device:
+        settings.docling_device = device
+    if batch_size:
+        settings.docling_batch_size = batch_size
 
     successes = 0
     errors = 0
@@ -381,6 +480,13 @@ def ingest_file(
     Returns:
         bool: True if successful, False otherwise
     """
+    try:
+        # Import inside to avoid top-level env issues
+        from docling.document_converter import DocumentConverter
+    except Exception as e:
+        logger.error(f"Failed to load Docling library: {e}", exc_info=True)
+        return False
+
     converter = _get_converter()
 
     try:
@@ -453,6 +559,8 @@ def ingest_from_content(
         # Create document stream and convert
         json_path.parent.mkdir(parents=True, exist_ok=True)
         ensure_content_dir_readme(json_path.parts[0] if json_path.parts else None)
+
+        from docling_core.types.io import DocumentStream
 
         stream = DocumentStream(name=stream_name, stream=BytesIO(content))
 
@@ -564,13 +672,27 @@ def generate_metadata(
         logger.warning(f"Failed to save metadata to {meta_path}: {e}")
 
 
-def ingest(source_path: str, dry_run: bool = False, force: bool = False) -> bool:
+def ingest(
+    source_path: str,
+    dry_run: bool = False,
+    force: bool = False,
+    pipeline: str | None = None,
+    model: str | None = None,
+    device: str | None = None,
+    batch_size: int | None = None,
+    workers: int | None = None,
+) -> bool:
     """Ingest all files from a source path into the content directory.
 
     Args:
         source_path: Path to search for files to ingest
         dry_run: If True, show what would be processed without doing it
         force: If True, force reprocessing even if files are up-to-date
+        pipeline: Optional docling pipeline selection
+        model: Optional docling model selection
+        device: Optional docling device selection
+        batch_size: Optional docling batch size selection
+        workers: Optional number of workers override
 
     Returns:
         bool: True if successful, False if any errors occurred
@@ -579,6 +701,18 @@ def ingest(source_path: str, dry_run: bool = False, force: bool = False) -> bool
 
     if not source_root.exists():
         raise Docs2DBException(f"Source path does not exist: {source_path}")
+
+    # Update settings from CLI if provided
+    if pipeline:
+        settings.docling_pipeline = pipeline
+    if model:
+        settings.docling_model = model
+    if device:
+        settings.docling_device = device
+    if batch_size:
+        settings.docling_batch_size = batch_size
+    if workers:
+        settings.docling_workers = workers
 
     # If source is a file, use its parent as the root to maintain directory structure
     if source_root.is_file():
@@ -610,10 +744,11 @@ def ingest(source_path: str, dry_run: bool = False, force: bool = False) -> bool
     # Use multiprocessing for ingestion
     processor = BatchProcessor(
         worker_function=ingest_batch,
-        worker_args=(str(source_root), force),
+        worker_args=(str(source_root), force, pipeline, model, device, batch_size),
         progress_message="Ingesting files...",
-        batch_size=3,  # Smaller batches since docling can be memory-intensive
+        batch_size=settings.docling_batch_size,
         mem_threshold_mb=1500,  # Lower threshold for docling processes
+        max_workers=settings.docling_workers,
     )
 
     processed, errors = processor.process_files(source_files)
