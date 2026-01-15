@@ -152,11 +152,6 @@ def _get_converter() -> Any:
         pdf_pipeline_options = PdfPipelineOptions()
         pdf_pipeline_options.accelerator_options.device = acc_device
 
-        # Set specific batch sizes
-        pdf_pipeline_options.ocr_batch_size = settings.docling_batch_size
-        pdf_pipeline_options.layout_batch_size = settings.docling_batch_size
-        pdf_pipeline_options.table_batch_size = settings.docling_batch_size
-
         format_options = {
             InputFormat.PDF: PdfFormatOption(
                 pipeline_options=pdf_pipeline_options,
