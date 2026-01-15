@@ -166,6 +166,11 @@ def start_database(profile: str = "prod") -> bool:
         logger.error(f"Failed to start database: {e}")
         if e.stderr:
             logger.error(e.stderr)
+            if runtime == "podman" and "Cannot connect to the Docker daemon" in e.stderr:
+                logger.info(
+                    "Hint: It looks like the Podman socket is not running. "
+                    "Try running: systemctl --user enable --now podman.socket"
+                )
         return False
 
 
@@ -222,6 +227,11 @@ def stop_database(profile: str = "prod") -> bool:
         logger.error(f"Failed to stop database: {e}")
         if e.stderr:
             logger.error(e.stderr)
+            if runtime == "podman" and "Cannot connect to the Docker daemon" in e.stderr:
+                logger.info(
+                    "Hint: It looks like the Podman socket is not running. "
+                    "Try running: systemctl --user enable --now podman.socket"
+                )
         return False
 
 
