@@ -1856,7 +1856,7 @@ def dump_database(
 
     # Build pg_dump command
     cmd = [
-        "pg_dump",
+        "pg_dump-17",
         f"--host={host}",
         f"--port={port}",
         f"--username={user}",
