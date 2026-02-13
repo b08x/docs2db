@@ -1,11 +1,13 @@
 """Embedding models and generation logic."""
 
 import json
+import subprocess
 import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import httpx
 import structlog
 
 from docs2db.utils import ensure_model_available, hash_file
@@ -134,7 +136,7 @@ class Embedding:
 
     def ensure_available(self) -> None:
         """Ensure the embedding model is available locally."""
-        ensure_model_available(self.model)
+        self.provider_cls.ensure_available(self.model)
 
     def _get_provider(self):
         """Get or create the embedding provider (lazy loading)."""
@@ -262,6 +264,11 @@ class EmbeddingProvider:
         self.batch_size = batch_size
         self.device = device
 
+    @classmethod
+    def ensure_available(cls, model: str) -> None:
+        """Ensure the model is available. Default implementation checks HF cache."""
+        ensure_model_available(model)
+
     def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for a list of texts."""
         raise NotImplementedError
@@ -373,6 +380,60 @@ class GraniteEmbeddingProvider(EmbeddingProvider):
         return all_embeddings
 
 
+class OllamaEmbeddingProvider(EmbeddingProvider):
+    """Ollama embedding provider."""
+
+    @classmethod
+    def ensure_available(cls, model: str) -> None:
+        """Ensure Ollama model is available via pull."""
+        logger.info(f"Ensuring Ollama model '{model}' is available...")
+        try:
+            subprocess.run(["ollama", "pull", model], check=True)
+        except FileNotFoundError:
+            logger.warning(
+                "Ollama command not found in PATH. "
+                "Assuming remote/local server is managed externally."
+            )
+        except subprocess.CalledProcessError:
+            logger.error(f"Failed to pull model '{model}'.")
+            raise
+
+    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings using Ollama."""
+        # Use default local address
+        url = "http://localhost:11434/api/embed"
+        all_embeddings = []
+
+        for i in range(0, len(texts), self.batch_size):
+            batch = texts[i : i + self.batch_size]
+            try:
+                payload = {"model": self.model, "input": batch}
+
+                # High timeout because embedding models can be slow to load/run
+                with httpx.Client(timeout=60.0) as client:
+                    response = client.post(url, json=payload)
+                    response.raise_for_status()
+                    data = response.json()
+
+                    if "embeddings" in data:
+                        all_embeddings.extend(data["embeddings"])
+                    else:
+                        raise ValueError(
+                            f"Ollama response missing 'embeddings' field: {data.keys()}"
+                        )
+
+            except httpx.RequestError as e:
+                logger.error(f"Ollama connection error: {e}")
+                raise
+            except httpx.HTTPStatusError as e:
+                logger.error(
+                    f"Ollama API error {e.response.status_code}: {e.response.text}"
+                )
+                raise
+
+        return all_embeddings
+
+
 class WatsonEmbeddingProvider(EmbeddingProvider):
     """Watson embedding provider - placeholder for now."""
 
@@ -435,6 +496,18 @@ EMBEDDING_CONFIGS = {
         "dimensions": 384,
         "batch_size": 32,
         "cls": E5EmbeddingProvider,
+    },
+    "embeddinggemma:latest": {
+        "keyword": "embgem",
+        "dimensions": 768,
+        "batch_size": 16,
+        "cls": OllamaEmbeddingProvider,
+    },
+    "bge-m3:latest": {
+        "keyword": "bgem3",
+        "dimensions": 768,
+        "batch_size": 16,
+        "cls": OllamaEmbeddingProvider,
     },
 }
 
