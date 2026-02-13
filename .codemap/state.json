@@ -1,0 +1,175 @@
+{
+  "updated_at": "2026-02-13T03:59:34.100433528-05:00",
+  "file_count": 125,
+  "hubs": [
+    "src/docs2db/ingest.py",
+    "src/docs2db/const.py",
+    "src/docs2db/multiproc.py",
+    "src/docs2db/embeddings.py",
+    "tests/test_config.py",
+    "src/docs2db/chunks.py",
+    "src/docs2db/database.py",
+    "src/docs2db/exceptions.py",
+    "src/docs2db/utils.py",
+    "src/docs2db/config.py"
+  ],
+  "importers": {
+    "src/docs2db/audit.py": [
+      "src/docs2db/docs2db.py"
+    ],
+    "src/docs2db/chunks.py": [
+      "src/docs2db/docs2db.py",
+      "src/docs2db/audit.py",
+      "tests/test_high_level_integration.py"
+    ],
+    "src/docs2db/config.py": [
+      "src/docs2db/chunks.py",
+      "src/docs2db/ingest.py",
+      "src/docs2db/database.py",
+      "src/docs2db/audit.py",
+      "src/docs2db/embed.py"
+    ],
+    "src/docs2db/const.py": [
+      "src/docs2db/chunks.py",
+      "src/docs2db/ingest.py",
+      "src/docs2db/database.py",
+      "src/docs2db/audit.py"
+    ],
+    "src/docs2db/database.py": [
+      "src/docs2db/docs2db.py",
+      "tests/test_db_config.py",
+      "tests/test_database.py",
+      "tests/test_schema_metadata.py",
+      "tests/test_high_level_integration.py"
+    ],
+    "src/docs2db/db_lifecycle.py": [
+      "src/docs2db/docs2db.py"
+    ],
+    "src/docs2db/embed.py": [
+      "src/docs2db/docs2db.py",
+      "tests/test_high_level_integration.py"
+    ],
+    "src/docs2db/embeddings.py": [
+      "src/docs2db/database.py",
+      "src/docs2db/audit.py",
+      "src/docs2db/embed.py"
+    ],
+    "src/docs2db/exceptions.py": [
+      "src/docs2db/docs2db.py",
+      "tests/test_db_config.py",
+      "src/docs2db/db_lifecycle.py",
+      "src/docs2db/utils.py",
+      "src/docs2db/ingest.py",
+      "src/docs2db/database.py",
+      "src/docs2db/audit.py",
+      "tests/test_high_level_integration.py"
+    ],
+    "src/docs2db/ingest.py": [
+      "src/docs2db/docs2db.py",
+      "tests/test_document_needs_update.py",
+      "tests/test_high_level_integration.py"
+    ],
+    "src/docs2db/multiproc.py": [
+      "src/docs2db/chunks.py",
+      "src/docs2db/ingest.py",
+      "src/docs2db/database.py",
+      "src/docs2db/embed.py"
+    ],
+    "src/docs2db/utils.py": [
+      "src/docs2db/docs2db.py",
+      "src/docs2db/chunks.py",
+      "src/docs2db/embeddings.py",
+      "src/docs2db/ingest.py"
+    ],
+    "tests/test_config.py": [
+      "tests/conftest.py",
+      "tests/test_cli_integration.py",
+      "tests/test_database.py",
+      "tests/test_schema_metadata.py",
+      "tests/test_high_level_integration.py"
+    ]
+  },
+  "imports": {
+    "src/docs2db/audit.py": [
+      "src/docs2db/chunks.py",
+      "src/docs2db/config.py",
+      "src/docs2db/const.py",
+      "src/docs2db/embeddings.py",
+      "src/docs2db/exceptions.py"
+    ],
+    "src/docs2db/chunks.py": [
+      "src/docs2db/config.py",
+      "src/docs2db/const.py",
+      "src/docs2db/multiproc.py",
+      "src/docs2db/utils.py"
+    ],
+    "src/docs2db/database.py": [
+      "src/docs2db/config.py",
+      "src/docs2db/const.py",
+      "src/docs2db/embeddings.py",
+      "src/docs2db/exceptions.py",
+      "src/docs2db/multiproc.py"
+    ],
+    "src/docs2db/db_lifecycle.py": [
+      "src/docs2db/exceptions.py"
+    ],
+    "src/docs2db/docs2db.py": [
+      "src/docs2db/audit.py",
+      "src/docs2db/chunks.py",
+      "src/docs2db/database.py",
+      "src/docs2db/db_lifecycle.py",
+      "src/docs2db/embed.py",
+      "src/docs2db/exceptions.py",
+      "src/docs2db/ingest.py",
+      "src/docs2db/utils.py"
+    ],
+    "src/docs2db/embed.py": [
+      "src/docs2db/config.py",
+      "src/docs2db/embeddings.py",
+      "src/docs2db/multiproc.py"
+    ],
+    "src/docs2db/embeddings.py": [
+      "src/docs2db/utils.py"
+    ],
+    "src/docs2db/ingest.py": [
+      "src/docs2db/config.py",
+      "src/docs2db/const.py",
+      "src/docs2db/exceptions.py",
+      "src/docs2db/multiproc.py",
+      "src/docs2db/utils.py"
+    ],
+    "src/docs2db/utils.py": [
+      "src/docs2db/exceptions.py"
+    ],
+    "tests/conftest.py": [
+      "tests/test_config.py"
+    ],
+    "tests/test_cli_integration.py": [
+      "tests/test_config.py"
+    ],
+    "tests/test_database.py": [
+      "src/docs2db/database.py",
+      "tests/test_config.py"
+    ],
+    "tests/test_db_config.py": [
+      "src/docs2db/database.py",
+      "src/docs2db/exceptions.py"
+    ],
+    "tests/test_document_needs_update.py": [
+      "src/docs2db/ingest.py"
+    ],
+    "tests/test_high_level_integration.py": [
+      "src/docs2db/chunks.py",
+      "src/docs2db/database.py",
+      "src/docs2db/embed.py",
+      "src/docs2db/exceptions.py",
+      "src/docs2db/ingest.py",
+      "tests/test_config.py"
+    ],
+    "tests/test_schema_metadata.py": [
+      "src/docs2db/database.py",
+      "tests/test_config.py"
+    ]
+  },
+  "recent_events": []
+}

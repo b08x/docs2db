@@ -197,7 +197,7 @@ class BatchProcessor:
             self.manager = multiprocessing.Manager()
             self.shared_state = self.manager.dict({
                 "lock": self.manager.Lock(),
-                "last_request_time": self.manager.Value("d", 0.0),
+                "last_request_time": 0.0,
             })
 
     def process_files(

@@ -238,31 +238,30 @@ class LLMProvider(ABC):
         """Throttle requests based on configured rate limit."""
         if settings.llm_rate_limit > 0:
             delay = 60.0 / settings.llm_rate_limit
+            now = time.time()
+            wait_time = 0.0
 
             if self.shared_state and "lock" in self.shared_state:
                 lock = self.shared_state["lock"]
-                last_time_val = self.shared_state["last_request_time"]
-
                 with lock:
-                    elapsed = time.time() - last_time_val.value
-                    if elapsed < delay:
-                        sleep_time = delay - elapsed
-                        if sleep_time > 2.0:
-                            logger.info(
-                                f"Throttling: sleeping {sleep_time:.1f}s to respect global rate limit ({settings.llm_rate_limit} RPM)"
-                            )
-                        time.sleep(sleep_time)
-                    last_time_val.value = time.time()
+                    last_time = self.shared_state.get("last_request_time", 0.0)
+                    # Schedule the next request start time
+                    scheduled_start = max(now, last_time + delay)
+                    wait_time = scheduled_start - now
+                    # Update last_request_time to the scheduled start time
+                    self.shared_state["last_request_time"] = scheduled_start
             else:
-                elapsed = time.time() - self._last_request_time
+                elapsed = now - self._last_request_time
                 if elapsed < delay:
-                    sleep_time = delay - elapsed
-                    if sleep_time > 2.0:
-                        logger.info(
-                            f"Throttling: worker sleeping {sleep_time:.1f}s (per-worker limit)"
-                        )
-                    time.sleep(sleep_time)
-                self._last_request_time = time.time()
+                    wait_time = delay - elapsed
+                self._last_request_time = now + wait_time
+
+            if wait_time > 0:
+                if wait_time > 2.0:
+                    logger.info(
+                        f"Throttling: sleeping {wait_time:.1f}s to respect rate limit ({settings.llm_rate_limit} RPM)"
+                    )
+                time.sleep(wait_time)
 
     @abstractmethod
     def get_chunk_context(self, chunk_prompt: str) -> str:
