@@ -1,10 +1,10 @@
 # Document Metadata
 
-Docs2DB generates `.meta.json` files alongside Docling JSON documents to store metadata about the source document, its processing, and optional user-supplied provenance.
+Docs2DB stores source, processing, and provenance metadata in `.meta.json` files alongside Docling JSON documents.
 
 ## Location and Naming
 
-Metadata files are stored adjacent to their corresponding Docling JSON files:
+Store metadata files adjacent to their corresponding Docling JSON files:
 ```
 content/
   docs/
@@ -14,34 +14,30 @@ content/
 
 ## File Structure
 
-The metadata file is **sparse** - only fields with actual data are included. Empty sections are omitted.
+Metadata files are sparse; they include only fields containing data.
 
 ### Example: Full Metadata
 ```json
 {
   "metadata_version": "1.0",
-
   "filesystem": {
     "original_path": "/sources/docs/guide.html",
     "size_bytes": 245680,
     "mtime": "2025-10-23T10:30:00Z",
     "detected_mime": "text/html"
   },
-
   "content": {
     "title": "ExampleTech 9.4 Administration Guide",
     "language": "en"
   },
-
   "source": {
     "source_type": "graphql",
-    "source_url": "https://docs.example.com/en/documentation/exampletech/9.4/html/system_administrators_guide/index",
+    "source_url": "https://docs.example.com/...",
     "source_etag": "abc123def456",
     "retrieved_at": "2025-10-23T10:30:00Z",
     "retriever": "example-documentation-v1.0",
     "license": "CC-BY-SA-4.0"
   },
-
   "processing": {
     "source_hash": "xxh64:a1b2c3d4e5f6...",
     "ingested_at": "2025-10-23T10:31:00Z",
@@ -67,52 +63,47 @@ The metadata file is **sparse** - only fields with actual data are included. Emp
 ## Field Descriptions
 
 ### Top Level
-- `metadata_version`: Schema version for the metadata format (e.g., `"1.0"`)
+- `metadata_version`: Schema version (e.g., `"1.0"`).
 
 ### `filesystem` (Auto-detected)
-Information about the source file on disk:
-- `original_path`: Full path to the original source file
-- `size_bytes`: File size in bytes
-- `mtime`: Last modification time (ISO 8601 format)
-- `detected_mime`: MIME type detected from file extension
+Source file information:
+- `original_path`: Full path to the original source file.
+- `size_bytes`: File size in bytes.
+- `mtime`: Last modification time (ISO 8601).
+- `detected_mime`: MIME type detected from the file extension.
 
 ### `content` (Auto-detected)
-Information extracted from the document content:
-- `title`: Document title (from Docling's `name` field)
-- `language`: Document language code (e.g., `"en"`, `"es"`)
+Extracted document information:
+- `title`: Document title (from Docling `name`).
+- `language`: Language code (e.g., `"en"`).
 
 ### `source` (User-supplied)
-Provenance information supplied by external tools (e.g., custom source retrievers):
-- `source_type`: Type of source (e.g., `"graphql"`, `"web"`, `"local"`)
-- `source_url`: Original URL where the document was retrieved
-- `source_etag`: ETag or version identifier from the source
-- `retrieved_at`: Timestamp when the document was retrieved (ISO 8601)
-- `retriever`: Tool/version that retrieved the document
-- `license`: Known license for the content (e.g., `"CC-BY-SA-4.0"`, `"Apache-2.0"`)
-- Custom fields as needed by retrievers
+Provenance information from external tools:
+- `source_type`: Source type (e.g., `"graphql"`, `"web"`, `"local"`).
+- `source_url`: Retrieval URL.
+- `source_etag`: ETag or version identifier.
+- `retrieved_at`: Retrieval timestamp (ISO 8601).
+- `retriever`: Tool or version that retrieved the document.
+- `license`: Content license (e.g., `"CC-BY-SA-4.0"`).
 
 ### `processing` (Auto-generated)
-Information about how the document was processed:
-- `source_hash`: xxHash (xxh64) of the source file (format: `"xxh64:..."`) - fast non-cryptographic hash
-- `ingested_at`: Timestamp when ingestion occurred (ISO 8601)
-- `docling_version`: Version of Docling used for conversion
+Processing information:
+- `source_hash`: xxHash (xxh64) of the source file.
+- `ingested_at`: Ingestion timestamp (ISO 8601).
+- `docling_version`: Docling version used for conversion.
 
 ## Usage
 
 ### During Ingestion
 
-The `ingest` command automatically generates metadata for all processed documents:
+The `ingest` command generates metadata for all processed documents:
 ```bash
 uv run docs2db ingest /path/to/sources
 ```
 
-This creates:
-- `content/**/*.json` (Docling documents)
-- `content/**/*.meta.json` (metadata)
-
 ### Supplying User Metadata
 
-External tools can supply metadata by calling the `generate_metadata` function:
+External tools supply metadata by calling `generate_metadata()`:
 
 ```python
 from docs2db.ingest import generate_metadata
@@ -135,13 +126,7 @@ generate_metadata(
 
 ### Auditing Metadata
 
-The `audit` command checks metadata files:
+The `audit` command verifies metadata files:
 ```bash
 uv run docs2db audit
 ```
-
-This reports:
-- Total metadata files
-- Orphaned metadata (no corresponding Docling JSON)
-- Version mismatches (outdated schema)
-- Invalid JSON files
