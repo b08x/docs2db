@@ -146,6 +146,22 @@ def chunk(
             help="Override model context limit (in tokens) for map-reduce summarization"
         ),
     ] = None,
+    max_retries: Annotated[
+        Optional[int], typer.Option(help="Max LLM retry attempts")
+    ] = None,
+    retry_min_wait: Annotated[
+        Optional[float], typer.Option(help="Min wait between LLM retries (seconds)")
+    ] = None,
+    retry_max_wait: Annotated[
+        Optional[float], typer.Option(help="Max wait between LLM retries (seconds)")
+    ] = None,
+    rate_limit: Annotated[
+        Optional[int], typer.Option(help="Max LLM requests per minute (0=unlimited)")
+    ] = None,
+    workers: Annotated[
+        Optional[int],
+        typer.Option("--workers", help="Number of parallel workers"),
+    ] = None,
 ) -> None:
     """Generate chunks for content files."""
     try:
@@ -162,6 +178,11 @@ def chunk(
             openrouter_url=openrouter_url,
             mistral_url=mistral_url,
             context_limit_override=context_limit,
+            max_retries=max_retries,
+            retry_min_wait=retry_min_wait,
+            retry_max_wait=retry_max_wait,
+            rate_limit=rate_limit,
+            workers=workers,
         ):
             raise typer.Exit(1)
     except Docs2DBException as e:
@@ -676,6 +697,18 @@ def pipeline(
             help="Override model context limit (in tokens) for map-reduce summarization"
         ),
     ] = None,
+    max_retries: Annotated[
+        Optional[int], typer.Option(help="Max LLM retry attempts")
+    ] = None,
+    retry_min_wait: Annotated[
+        Optional[float], typer.Option(help="Min wait between LLM retries (seconds)")
+    ] = None,
+    retry_max_wait: Annotated[
+        Optional[float], typer.Option(help="Max wait between LLM retries (seconds)")
+    ] = None,
+    rate_limit: Annotated[
+        Optional[int], typer.Option(help="Max LLM requests per minute (0=unlimited)")
+    ] = None,
     pipeline: Annotated[
         Optional[str],
         typer.Option("--pipeline", help="Docling pipeline: 'standard' or 'vlm'"),
@@ -780,6 +813,11 @@ def pipeline(
             openrouter_url=openrouter_url,
             mistral_url=mistral_url,
             context_limit_override=context_limit,
+            max_retries=max_retries,
+            retry_min_wait=retry_min_wait,
+            retry_max_wait=retry_max_wait,
+            rate_limit=rate_limit,
+            workers=workers,
         ):
             raise Docs2DBException("Failed to generate chunks")
 

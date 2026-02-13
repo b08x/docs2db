@@ -1,6 +1,7 @@
 """Multiprocessing utilities for Docs2DB."""
 
 import logging
+import multiprocessing
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -171,6 +172,7 @@ class BatchProcessor:
         batch_size: int,
         mem_threshold_mb: int,
         max_workers: Optional[int] = None,
+        use_shared_state: bool = False,
     ):
         self.worker_function = worker_function
         self.worker_args = worker_args
@@ -178,6 +180,7 @@ class BatchProcessor:
         self.batch_size = batch_size
         self.mem_threshold_mb = mem_threshold_mb
         self.max_workers = max_workers
+        self.use_shared_state = use_shared_state
 
         # Processing state
         self.processed = 0
@@ -187,6 +190,15 @@ class BatchProcessor:
         self.executor: Optional[ProcessPoolExecutor] = None
         self.display: Optional[ProgressDisplay] = None
         self.console = Console()
+
+        self.manager = None
+        self.shared_state = None
+        if self.use_shared_state:
+            self.manager = multiprocessing.Manager()
+            self.shared_state = self.manager.dict({
+                "lock": self.manager.Lock(),
+                "last_request_time": self.manager.Value("d", 0.0),
+            })
 
     def process_files(
         self,
@@ -221,6 +233,8 @@ class BatchProcessor:
                 self._process_all_batches(batches)
             finally:
                 self.executor.shutdown(wait=True)
+                if self.manager:
+                    self.manager.shutdown()
 
         self._restore_logging()
         self._display_errors()
@@ -266,9 +280,12 @@ class BatchProcessor:
         try:
             batch = next(batches)
             self.display.set_worker_status(worker_id, f"processing {batch[0]}")
-            future = self.executor.submit(
-                self.worker_function, batch, *self.worker_args
-            )
+
+            args = list(self.worker_args)
+            if self.use_shared_state:
+                args.append(self.shared_state)
+
+            future = self.executor.submit(self.worker_function, batch, *args)
             self.futures[future] = worker_id, batch
             return True
         except StopIteration:
