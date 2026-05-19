@@ -27,7 +27,7 @@ def get_schema_metadata(conn):
         result = cur.fetchone()
         if result:
             columns = [desc[0] for desc in cur.description]
-            return dict(zip(columns, result, strict=False))
+            return dict(zip(columns, result))
     return None
 
 
@@ -37,7 +37,7 @@ def get_schema_changes(conn):
         cur.execute("SELECT * FROM schema_changes ORDER BY id")
         results = cur.fetchall()
         columns = [desc[0] for desc in cur.description]
-        return [dict(zip(columns, row, strict=False)) for row in results]
+        return [dict(zip(columns, row)) for row in results]
 
 
 class TestSchemaMetadata:

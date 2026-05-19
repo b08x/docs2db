@@ -896,9 +896,7 @@ class DatabaseManager:
                             )
 
                         # Prepare chunks data for this document
-                        for chunk_idx, (chunk, embedding_vector) in enumerate(
-                            zip(chunks, embedding_vectors, strict=False)
-                        ):
+                        for chunk_idx, (chunk, embedding_vector) in enumerate(zip(chunks, embedding_vectors)):
                             chunk_data = (
                                 document_id,
                                 chunk_idx,
@@ -1259,7 +1257,7 @@ def check_database_status(
             metadata_row = metadata_result.fetchone()
             if metadata_row and metadata_result.description:
                 columns = [desc[0] for desc in metadata_result.description]
-                metadata = dict(zip(columns, metadata_row, strict=False))
+                metadata = dict(zip(columns, metadata_row))
 
                 logger.info(
                     "\nSchema Metadata:\n"
@@ -1301,7 +1299,7 @@ def check_database_status(
             for row in changes_result:
                 if changes_result.description:
                     columns = [desc[0] for desc in changes_result.description]
-                    change_data = dict(zip(columns, row, strict=False))
+                    change_data = dict(zip(columns, row))
                     changes.append(change_data)
 
             if changes:
