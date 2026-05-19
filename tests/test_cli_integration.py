@@ -29,7 +29,7 @@ def check_table_exists(conn, table_name: str) -> bool:
 def count_records(conn, table_name: str) -> int:
     """Count records in a table."""
     with conn.cursor() as cur:
-        cur.execute(f"SELECT COUNT(*) FROM {table_name}")
+        cur.execute(f"SELECT COUNT(*) FROM {table_name}")  # noqa: S608
         result = cur.fetchone()
         return result[0] if result else 0
 
@@ -78,7 +78,7 @@ class TestCLIIntegrationSQL:
                 "--force",  # Force to ensure it processes our test file
             ]
 
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 cmd,
                 capture_output=True,
                 text=True,
@@ -128,7 +128,7 @@ class TestCLIIntegrationSQL:
             # Test 1: Database server down (wrong port)
             cmd_base = ["uv", "run", "docs2db", "db-status"]
 
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 cmd_base
                 + [
                     "--host",
@@ -156,7 +156,7 @@ class TestCLIIntegrationSQL:
             )
 
             # Test 2: Server up but database doesn't exist
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 cmd_base
                 + [
                     "--host",
@@ -181,7 +181,7 @@ class TestCLIIntegrationSQL:
             )
 
             # Test 3: Database exists but is not initialized
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 cmd_base
                 + [
                     "--host",
@@ -214,8 +214,8 @@ class TestCLIIntegrationSQL:
             import tempfile
 
             with tempfile.TemporaryDirectory() as empty_dir:
-                load_result = subprocess.run(
-                    [
+                load_result = subprocess.run(  # noqa: S603
+                    [  # noqa: S607
                         "uv",
                         "run",
                         "docs2db",
@@ -245,7 +245,7 @@ class TestCLIIntegrationSQL:
                 )
 
             # Now test db-status - should show initialized database with 0 counts
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 cmd_base
                 + [
                     "--host",
@@ -272,8 +272,8 @@ class TestCLIIntegrationSQL:
             # Test 5: Database with actual data
             fixtures_content_dir = Path(__file__).parent / "fixtures" / "content" / "documents"
 
-            load_result = subprocess.run(
-                [
+            load_result = subprocess.run(  # noqa: S603
+                [  # noqa: S607
                     "uv",
                     "run",
                     "docs2db",
@@ -301,7 +301,7 @@ class TestCLIIntegrationSQL:
             assert load_result.returncode == 0, f"Load should succeed: {load_result.stdout}"
 
             # Now test db-status with data
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 cmd_base
                 + [
                     "--host",
@@ -371,7 +371,7 @@ class TestCLIIntegrationSQL:
                 "--force",
             ]
 
-            load_result = subprocess.run(
+            load_result = subprocess.run(  # noqa: S603
                 load_cmd,
                 capture_output=True,
                 text=True,
@@ -426,7 +426,7 @@ class TestCLIIntegrationSQL:
                     config["password"],
                 ]
 
-                config_result = subprocess.run(
+                config_result = subprocess.run(  # noqa: S603
                     config_cmd,
                     capture_output=True,
                     text=True,
@@ -491,7 +491,7 @@ class TestCLIIntegrationSQL:
                     config["password"],
                 ]
 
-                update_result = subprocess.run(
+                update_result = subprocess.run(  # noqa: S603
                     update_cmd,
                     capture_output=True,
                     text=True,
@@ -550,7 +550,7 @@ class TestCLIIntegrationSQL:
                     config["password"],
                 ]
 
-                empty_result = subprocess.run(
+                empty_result = subprocess.run(  # noqa: S603
                     empty_cmd,
                     capture_output=True,
                     text=True,
@@ -580,7 +580,7 @@ class TestCLIIntegrationSQL:
                     config["password"],
                 ]
 
-                clear_result = subprocess.run(
+                clear_result = subprocess.run(  # noqa: S603
                     clear_prompt_cmd,
                     capture_output=True,
                     text=True,
@@ -622,7 +622,7 @@ class TestCLIIntegrationSQL:
                     config["password"],
                 ]
 
-                clear_all_result = subprocess.run(
+                clear_all_result = subprocess.run(  # noqa: S603
                     clear_all_cmd,
                     capture_output=True,
                     text=True,

@@ -30,7 +30,7 @@ from tests.test_config import should_skip_postgres_tests
 def count_records(conn, table_name: str) -> int:
     """Count records in a table."""
     with conn.cursor() as cur:
-        cur.execute(f"SELECT COUNT(*) FROM {table_name}")
+        cur.execute(f"SELECT COUNT(*) FROM {table_name}")  # noqa: S608
         result = cur.fetchone()
         return result[0] if result else 0
 

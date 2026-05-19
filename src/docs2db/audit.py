@@ -105,7 +105,6 @@ def perform_audit(
         for source_file in source_files:
             # source_file is .../doc_dir/source.json
             doc_dir = source_file.parent
-            doc_name = doc_dir.name
             # Get full relative path from content directory for better reporting
             doc_rel_path = doc_dir.relative_to(content_path)
 
@@ -151,17 +150,16 @@ def perform_audit(
                             model_config = config
                             break
 
-                    assert model is not None
-                    assert model_config is not None
-                    if chunks_file.exists():
-                        if is_embedding_stale(
-                            embed_file,
-                            chunks_file,
-                            model,
-                            model_config["dimensions"],
-                        ):
-                            messages.append(f"stale embedding   : {doc_rel_path}/{keyword}.json")
-                            has_stale_embedding = True
+                    assert model is not None  # noqa: S101  # RSPEED-3062: replace asserts with guards
+                    assert model_config is not None  # noqa: S101
+                    if chunks_file.exists() and is_embedding_stale(
+                        embed_file,
+                        chunks_file,
+                        model,
+                        model_config["dimensions"],
+                    ):
+                        messages.append(f"stale embedding   : {doc_rel_path}/{keyword}.json")
+                        has_stale_embedding = True
 
             # Advance embed_task once per document, not once per embedding file
             if found_any_embedding:

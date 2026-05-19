@@ -230,7 +230,7 @@ class DatabaseManager:
 
         if updates:
             updates.append("last_modified_at = NOW()")
-            sql = f"UPDATE schema_metadata SET {', '.join(updates)} WHERE id = 1"
+            sql = f"UPDATE schema_metadata SET {', '.join(updates)} WHERE id = 1"  # noqa: S608
             conn.execute(sql, params)
 
     def format_schema_change_display(self, change_data: dict) -> str:
@@ -687,7 +687,7 @@ class DatabaseManager:
                     updated_fields.append("refinement_questions_count")
 
                 if updates:
-                    update_sql = f"UPDATE rag_settings SET {', '.join(updates)} WHERE id = 1"
+                    update_sql = f"UPDATE rag_settings SET {', '.join(updates)} WHERE id = 1"  # noqa: S608
                     conn.execute(update_sql, values)
                     logger.info(f"RAG settings updated: {', '.join(updated_fields)}")
                 else:
@@ -771,7 +771,7 @@ class DatabaseManager:
         for (
             source_file,
             chunks_file,
-            model_name,
+            _model_name,
             embedding_data,
             embedding_file,
         ) in files_data:
@@ -785,7 +785,8 @@ class DatabaseManager:
 
                 if len(chunks) != len(embedding_vectors):
                     logger.error(
-                        f"Chunks count ({len(chunks)}) != embeddings count ({len(embedding_vectors)}) for {source_file.name}"
+                        f"Chunks count ({len(chunks)}) != embeddings count "
+                        f"({len(embedding_vectors)}) for {source_file.name}"
                     )
                     errors += 1
                     continue
@@ -867,7 +868,8 @@ class DatabaseManager:
                         # Insert/update document
                         doc_result = conn.execute(
                             """
-                            INSERT INTO documents (path, filename, content_type, file_size, last_modified, chunks_file_path)
+                            INSERT INTO documents
+                                (path, filename, content_type, file_size, last_modified, chunks_file_path)
                             VALUES (%s, %s, %s, %s, %s, %s)
                             ON CONFLICT (path) DO UPDATE SET
                                 filename = EXCLUDED.filename,
@@ -933,7 +935,8 @@ class DatabaseManager:
                         conn.execute(SQL("SAVEPOINT {}").format(Identifier(f"sp_chunk_{idx}")))
                         chunk_result = conn.execute(
                             """
-                            INSERT INTO chunks (document_id, chunk_index, text, contextual_text, metadata, text_search_vector)
+                            INSERT INTO chunks
+                                (document_id, chunk_index, text, contextual_text, metadata, text_search_vector)
                             VALUES (%s, %s, %s, %s, %s, to_tsvector('english', %s))
                             ON CONFLICT (document_id, chunk_index) DO UPDATE SET
                                 text = EXCLUDED.text,
@@ -1264,9 +1267,10 @@ def check_database_status(
                     f"  Title          : {metadata['title'] or '(not set)'}\n"
                     f"  Description    : {metadata['description'] or '(not set)'}\n"
                     f"  Models         : {metadata['embedding_models_count']}\n"
-                    f"  Last modified  : {metadata['last_modified_at'].strftime('%Y-%m-%d %H:%M') if metadata['last_modified_at'] else 'Unknown'}"
+                    f"  Last modified  : "
+                    f"{metadata['last_modified_at'].strftime('%Y-%m-%d %H:%M') if metadata['last_modified_at'] else 'Unknown'}"  # noqa: E501
                 )
-        except Exception:
+        except Exception:  # noqa: S110
             # Schema metadata table doesn't exist yet
             pass
 
@@ -1304,7 +1308,7 @@ def check_database_status(
                 logger.info("\nRecent Changes (last 5):")
                 for change_data in changes:
                     logger.info(db_manager.format_schema_change_display(change_data))
-        except Exception:
+        except Exception:  # noqa: S110
             # Schema changes table doesn't exist yet
             pass
 
@@ -1326,7 +1330,12 @@ def check_database_status(
                 path, created_at, updated_at = row
                 # Strip /source.json suffix for cleaner display
                 display_path = path.removesuffix("/source.json")
-                file_str += f"  {display_path}\n    created: {created_at.strftime('%Y-%m-%d %H:%M')}\n    updated: {updated_at.strftime('%Y-%m-%d %H:%M') if updated_at else 'Never'}\n"
+                updated_str = updated_at.strftime("%Y-%m-%d %H:%M") if updated_at else "Never"
+                file_str += (
+                    f"  {display_path}\n"
+                    f"    created: {created_at.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"    updated: {updated_str}\n"
+                )
             logger.info(f"\nRecent document activity (last 5)\n{file_str}")
 
         # Database size information
@@ -1864,7 +1873,7 @@ def dump_database(
         logger.info("Creating database dump...")
 
         # Run pg_dump
-        subprocess.run(
+        subprocess.run(  # noqa: S603
             cmd,
             env=env,
             capture_output=not verbose,
@@ -1954,7 +1963,7 @@ def restore_database(
         logger.info("Restoring database from dump...")
 
         # Run psql
-        subprocess.run(
+        subprocess.run(  # noqa: S603
             cmd,
             env=env,
             capture_output=not verbose,
@@ -2079,7 +2088,7 @@ def configure_rag_settings(
         try:
             return type_func(value), False
         except ValueError:
-            raise ConfigurationError(f"{name}: must be a number or 'None', got '{value}'")
+            raise ConfigurationError(f"{name}: must be a number or 'None', got '{value}'") from None
 
     # Parse refinement_prompt (string)
     if refinement_prompt is not None:

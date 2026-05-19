@@ -133,10 +133,7 @@ class ProgressDisplay(Live):
         pre = f"Worker {worker_id:>2}: "
         available_width = terminal_width - len(pre) - 4
 
-        if len(status) > available_width:
-            trim_status = status[: available_width - 3] + "..."
-        else:
-            trim_status = status
+        trim_status = status[: available_width - 3] + "..." if len(status) > available_width else status
 
         self.worker_lines[worker_id] = Text(f"{pre}{trim_status}", style="dim")
 
@@ -307,8 +304,8 @@ class BatchProcessor:
 
     def _prime_worker_pool(self, batches):
         """Submit initial batches to all available workers."""
-        assert isinstance(self.display, ProgressDisplay)
-        assert isinstance(self.max_workers, int)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
+        assert isinstance(self.max_workers, int)  # noqa: S101
         for worker_id in range(self.max_workers):
             self._submit_batch_to_worker(worker_id, batches)
         self.display.refresh_display()
@@ -319,8 +316,8 @@ class BatchProcessor:
         Returns True if batch was submitted.
 
         """
-        assert isinstance(self.display, ProgressDisplay)
-        assert isinstance(self.executor, ProcessPoolExecutor)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
+        assert isinstance(self.executor, ProcessPoolExecutor)  # noqa: S101
         try:
             batch = next(batches)
             self.display.set_worker_status(worker_id, f"processing {batch[0]}")
@@ -377,7 +374,7 @@ class BatchProcessor:
 
     def _process_successful_result(self, result, worker_id: int, batch):
         """Update logs and displays for a successful batch result."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
         # Replay worker logs
         for log_entry in result["worker_logs"]:
             logger.log(
@@ -395,7 +392,7 @@ class BatchProcessor:
 
     def _process_failed_result(self, error, worker_id: int, batch):
         """Update error tracking and displays for a failed batch result."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
 
         # Log detailed error information
         logger.error(
@@ -420,8 +417,8 @@ class BatchProcessor:
 
     def _restart_workers(self, batches):
         """Restart all workers to clear memory."""
-        assert isinstance(self.display, ProgressDisplay)
-        assert isinstance(self.executor, ProcessPoolExecutor)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
+        assert isinstance(self.executor, ProcessPoolExecutor)  # noqa: S101
         # Complete remaining futures before restart
         remaining_futures = list(self.futures.keys())
         if remaining_futures:
@@ -435,7 +432,7 @@ class BatchProcessor:
         self.futures = {}
 
         # Update worker statuses
-        assert isinstance(self.max_workers, int)
+        assert isinstance(self.max_workers, int)  # noqa: S101
         for worker_id in range(self.max_workers):
             self.display.set_worker_status(worker_id, "restarted")
         self.display.refresh_display()
@@ -443,7 +440,7 @@ class BatchProcessor:
 
     def _complete_remaining_futures(self, remaining_futures):
         """Complete all remaining futures before worker restart."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
         for future in as_completed(remaining_futures):
             if future in self.futures:
                 worker_id, batch = self.futures.pop(future)
@@ -473,7 +470,7 @@ class BatchProcessor:
 
     def _update_display(self):
         """Update the progress display."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
         self.display.update_progress(
             completed=self.processed,
             errors=self.errors,

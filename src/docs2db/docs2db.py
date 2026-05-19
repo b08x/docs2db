@@ -47,7 +47,7 @@ def ingest(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -95,7 +95,7 @@ def chunk(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -129,7 +129,7 @@ def embed(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -191,7 +191,7 @@ def load(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="db-status")
@@ -228,7 +228,7 @@ def db_status(
         )
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="db-dump")
@@ -270,7 +270,7 @@ def db_dump(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="db-restore")
@@ -312,7 +312,7 @@ def db_restore(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -332,7 +332,7 @@ def audit(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -398,7 +398,7 @@ def config(
         )
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -438,7 +438,7 @@ def manifest(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="cleanup-workers")
@@ -449,7 +449,7 @@ def cleanup_workers() -> None:
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="db-start")
@@ -464,7 +464,7 @@ def db_start() -> None:
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="db-stop")
@@ -478,7 +478,7 @@ def db_stop() -> None:
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="db-destroy")
@@ -492,7 +492,7 @@ def db_destroy() -> None:
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="db-logs")
@@ -508,7 +508,7 @@ def db_logs(
             raise typer.Exit(1)
     except Docs2DBException as e:
         logger.error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -658,20 +658,20 @@ def pipeline(
         logger.info("Cleaning up...")
 
         # Try to stop database on failure
-        try:
+        try:  # noqa: SIM105
             stop_database()
-        except Exception:
+        except Exception:  # noqa: S110
             pass  # Ignore cleanup errors
 
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except KeyboardInterrupt:
         logger.warning("Pipeline interrupted by user")
         logger.info("Cleaning up...")
 
         # Try to stop database on interrupt
-        try:
+        try:  # noqa: SIM105
             stop_database()
-        except Exception:
+        except Exception:  # noqa: S110
             pass  # Ignore cleanup errors
 
-        raise typer.Exit(130)  # Standard exit code for SIGINT
+        raise typer.Exit(130) from None  # Standard exit code for SIGINT

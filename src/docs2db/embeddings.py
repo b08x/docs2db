@@ -54,10 +54,7 @@ def is_embedding_stale(
         # Check if model or dimensions have changed
         if metadata.get("model") != model:
             return True
-        if metadata.get("dimensions") != dimensions:
-            return True
-
-        return False
+        return metadata.get("dimensions") != dimensions
 
     except (json.JSONDecodeError, KeyError, ValueError, FileNotFoundError):
         return True

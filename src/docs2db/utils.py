@@ -71,7 +71,7 @@ def cleanup_orphaned_workers() -> bool:
         ConfigurationError: If system commands are not available
     """
     try:
-        result = subprocess.run(["ps", "aux"], capture_output=True, text=True, check=True)
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True, check=True)  # noqa: S607
 
         orphaned_processes = []
         current_pid = os.getpid()

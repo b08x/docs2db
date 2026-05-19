@@ -95,10 +95,7 @@ def is_chunks_stale(chunks_file: Path, source_file: Path) -> bool:
             return True
 
         stored_params = metadata["processing"]["parameters"]
-        if stored_params != CURRENT_METADATA:
-            return True
-
-        return False
+        return stored_params != CURRENT_METADATA
 
     except (json.JSONDecodeError, KeyError, ValueError, FileNotFoundError):
         return True
@@ -281,7 +278,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
 {text}
 
-Summary:"""
+Summary:"""  # noqa: E501
 
         # Log what we're about to send
         word_count = len(prompt.split())
@@ -321,7 +318,7 @@ Summary:"""
             },
             {
                 "role": "user",
-                "content": f"I will give you a document, then ask you to provide context for specific chunks from it.\n\n<document>\n{doc_text}\n</document>",
+                "content": f"I will give you a document, then ask you to provide context for specific chunks from it.\n\n<document>\n{doc_text}\n</document>",  # noqa: E501
             },
             {
                 "role": "assistant",
@@ -380,7 +377,7 @@ class WatsonXProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": f"I will give you a document, then ask you to provide context for a specific chunk from it.\n\n<document>\n{self.doc_text}\n</document>",
+                "content": f"I will give you a document, then ask you to provide context for a specific chunk from it.\n\n<document>\n{self.doc_text}\n</document>",  # noqa: E501
             },
             {
                 "role": "assistant",
@@ -406,7 +403,7 @@ class WatsonXProvider(LLMProvider):
 
 {text}
 
-Summary:"""
+Summary:"""  # noqa: E501
 
         messages = [
             {
@@ -582,10 +579,7 @@ class LLMSession:
         doc_chars = len(doc_text)
 
         # Determine model limits
-        if self.context_limit_override:
-            model_limit = self.context_limit_override
-        else:
-            model_limit = MODEL_CONTEXT_LIMITS.get(self.model, 32768)
+        model_limit = self.context_limit_override or MODEL_CONTEXT_LIMITS.get(self.model, 32768)
         usable_limit = int(model_limit * CONTEXT_SAFETY_MARGIN)
 
         logger.debug(
@@ -614,7 +608,7 @@ class LLMSession:
 {chunk_text}
 </chunk>
 
-Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
+Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""  # noqa: E501
 
         return self.provider.get_chunk_context(chunk_prompt)
 
@@ -665,7 +659,7 @@ def generate_chunks_for_document(
 
     # Reuse LLM session if context generation is enabled
     if not skip_context:
-        assert llm_session is not None
+        assert llm_session is not None  # noqa: S101
         doc_text = dl_doc.export_to_markdown()
         llm_session.set_document(doc_text)
 
@@ -891,9 +885,9 @@ def generate_chunks_batch(
     finally:
         # Clean up the reusable session
         if reusable_llm_session:
-            try:
+            try:  # noqa: SIM105
                 reusable_llm_session.close()
-            except Exception:
+            except Exception:  # noqa: S110
                 pass  # Don't mask exceptions from try block
 
     # Report worker memory footprint.
@@ -936,7 +930,8 @@ def generate_chunks(
         provider: LLM provider ("openai" or "watsonx"); inferred from URLs or defaults to settings.llm_provider.
         openai_url: OpenAI-compatible API URL (defaults to settings.llm_openai_url).
         watsonx_url: WatsonX API URL (defaults to settings.llm_watsonx_url).
-        context_limit_override: Override model context limit in tokens (defaults to settings.llm_context_limit_override).
+        context_limit_override: Override model context limit in tokens
+            (defaults to settings.llm_context_limit_override).
 
     Returns:
         bool: True if successful, False if any errors occurred.

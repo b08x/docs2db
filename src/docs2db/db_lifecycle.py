@@ -145,7 +145,7 @@ def start_database(profile: str = "prod") -> bool:
             "-d",
         ]
 
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             cmd,
             capture_output=True,
             text=True,
@@ -199,7 +199,7 @@ def stop_database(profile: str = "prod") -> bool:
             "down",
         ]
 
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             cmd,
             capture_output=True,
             text=True,
@@ -257,7 +257,7 @@ def destroy_database(profile: str = "prod") -> bool:
 
         cmd = [runtime, "volume", "rm", volume_name]
 
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             cmd,
             capture_output=True,
             text=True,
@@ -313,7 +313,7 @@ def get_database_logs(follow: bool = False) -> bool:
         cmd.append("db")
 
         # For logs, we want to show output directly to user
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True)  # noqa: S603
 
         return True
 

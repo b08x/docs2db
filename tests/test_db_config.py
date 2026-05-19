@@ -32,7 +32,7 @@ def test_default_config(clean_env, tmp_path, monkeypatch):
     assert config["port"] == "5432"
     assert config["database"] == "ragdb"
     assert config["user"] == "postgres"
-    assert config["password"] == "postgres"
+    assert config["password"] == "postgres"  # noqa: S105
 
 
 def test_env_vars_override_defaults(clean_env, tmp_path, monkeypatch):
@@ -50,7 +50,7 @@ def test_env_vars_override_defaults(clean_env, tmp_path, monkeypatch):
     assert config["port"] == "5433"
     assert config["database"] == "production_db"
     assert config["user"] == "admin"
-    assert config["password"] == "secret123"
+    assert config["password"] == "secret123"  # noqa: S105
 
 
 def test_database_url(clean_env, tmp_path, monkeypatch):
@@ -64,7 +64,7 @@ def test_database_url(clean_env, tmp_path, monkeypatch):
     assert config["port"] == "5434"
     assert config["database"] == "mydb"
     assert config["user"] == "myuser"
-    assert config["password"] == "mypass"
+    assert config["password"] == "mypass"  # noqa: S105
 
 
 def test_database_url_postgres_scheme(clean_env, tmp_path, monkeypatch):
@@ -76,7 +76,7 @@ def test_database_url_postgres_scheme(clean_env, tmp_path, monkeypatch):
 
     assert config["host"] == "localhost"
     assert config["user"] == "user"
-    assert config["password"] == "pass"
+    assert config["password"] == "pass"  # noqa: S105
 
 
 def test_database_url_without_port(clean_env, tmp_path, monkeypatch):
@@ -153,7 +153,7 @@ services:
     config = get_db_config()
 
     assert config["user"] == "compose_user"
-    assert config["password"] == "compose_pass"
+    assert config["password"] == "compose_pass"  # noqa: S105
     assert config["database"] == "compose_db"
     assert config["port"] == "5435"
 
