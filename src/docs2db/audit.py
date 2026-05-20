@@ -150,8 +150,10 @@ def perform_audit(
                             model_config = config
                             break
 
-                    assert model is not None  # noqa: S101  # RSPEED-3062: replace asserts with guards
-                    assert model_config is not None  # noqa: S101
+                    if model is None:
+                        raise ContentError(f"Unknown embedding model: {keyword}")
+                    if model_config is None:
+                        raise ContentError(f"Unknown embedding model config: {keyword}")
                     if chunks_file.exists() and is_embedding_stale(
                         embed_file,
                         chunks_file,
