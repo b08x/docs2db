@@ -2,22 +2,24 @@
 
 import logging
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+
+from concurrent.futures import as_completed
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Optional
 
 import structlog
-from rich.console import Console, Group
+
+from rich.console import Console
+from rich.console import Group
 from rich.live import Live
 from rich.logging import RichHandler
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
+from rich.progress import BarColumn
+from rich.progress import Progress
+from rich.progress import SpinnerColumn
+from rich.progress import TextColumn
+from rich.progress import TimeRemainingColumn
 from rich.text import Text
+
 
 logger = structlog.get_logger(__name__)
 
@@ -46,8 +48,8 @@ def batch_generator(files: list[Path], batch_size: int):
 
 def worker_count(
     total_files: int,
-    max_workers: Optional[int] = None,
-    max_workers_config: Optional[int] = None,
+    max_workers: int | None = None,
+    max_workers_config: int | None = None,
 ) -> int:
     """Determine optimal number of workers for processing.
 
@@ -131,10 +133,7 @@ class ProgressDisplay(Live):
         pre = f"Worker {worker_id:>2}: "
         available_width = terminal_width - len(pre) - 4
 
-        if len(status) > available_width:
-            trim_status = status[: available_width - 3] + "..."
-        else:
-            trim_status = status
+        trim_status = status[: available_width - 3] + "..." if len(status) > available_width else status
 
         self.worker_lines[worker_id] = Text(f"{pre}{trim_status}", style="dim")
 
@@ -170,7 +169,7 @@ class BatchProcessor:
         progress_message: str,
         batch_size: int,
         mem_threshold_mb: int,
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
     ):
         self.worker_function = worker_function
         self.worker_args = worker_args
@@ -184,8 +183,8 @@ class BatchProcessor:
         self.errors = 0
         self.error_data = []
         self.futures = {}
-        self.executor: Optional[ProcessPoolExecutor] = None
-        self.display: Optional[ProgressDisplay] = None
+        self.executor: ProcessPoolExecutor | None = None
+        self.display: ProgressDisplay | None = None
         self.console = Console()
 
     def process_files(
@@ -210,15 +209,11 @@ class BatchProcessor:
 
         batches = batch_generator(to_process, self.batch_size)
 
-        self.console.print(
-            f"[blue]Processing {count} files using {self.max_workers} workers[/blue]"
-        )
+        self.console.print(f"[blue]Processing {count} files using {self.max_workers} workers[/blue]")
 
         self._setup_logging()
 
-        with ProgressDisplay(
-            self.console, self.max_workers, count, self.progress_message
-        ) as display:
+        with ProgressDisplay(self.console, self.max_workers, count, self.progress_message) as display:
             self.display = display
             self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
 
@@ -249,9 +244,7 @@ class BatchProcessor:
             tuple[int, int]: (num_processed, num_failed)
         """
         count = len(to_process)
-        self.console.print(
-            f"[blue]Processing {count} files in single-threaded mode[/blue]"
-        )
+        self.console.print(f"[blue]Processing {count} files in single-threaded mode[/blue]")
 
         batches = list(batch_generator(to_process, self.batch_size))
 
@@ -311,8 +304,8 @@ class BatchProcessor:
 
     def _prime_worker_pool(self, batches):
         """Submit initial batches to all available workers."""
-        assert isinstance(self.display, ProgressDisplay)
-        assert isinstance(self.max_workers, int)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
+        assert isinstance(self.max_workers, int)  # noqa: S101
         for worker_id in range(self.max_workers):
             self._submit_batch_to_worker(worker_id, batches)
         self.display.refresh_display()
@@ -323,14 +316,12 @@ class BatchProcessor:
         Returns True if batch was submitted.
 
         """
-        assert isinstance(self.display, ProgressDisplay)
-        assert isinstance(self.executor, ProcessPoolExecutor)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
+        assert isinstance(self.executor, ProcessPoolExecutor)  # noqa: S101
         try:
             batch = next(batches)
             self.display.set_worker_status(worker_id, f"processing {batch[0]}")
-            future = self.executor.submit(
-                self.worker_function, batch, *self.worker_args
-            )
+            future = self.executor.submit(self.worker_function, batch, *self.worker_args)
             self.futures[future] = worker_id, batch
             return True
         except StopIteration:
@@ -383,7 +374,7 @@ class BatchProcessor:
 
     def _process_successful_result(self, result, worker_id: int, batch):
         """Update logs and displays for a successful batch result."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
         # Replay worker logs
         for log_entry in result["worker_logs"]:
             logger.log(
@@ -401,7 +392,7 @@ class BatchProcessor:
 
     def _process_failed_result(self, error, worker_id: int, batch):
         """Update error tracking and displays for a failed batch result."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
 
         # Log detailed error information
         logger.error(
@@ -426,8 +417,8 @@ class BatchProcessor:
 
     def _restart_workers(self, batches):
         """Restart all workers to clear memory."""
-        assert isinstance(self.display, ProgressDisplay)
-        assert isinstance(self.executor, ProcessPoolExecutor)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
+        assert isinstance(self.executor, ProcessPoolExecutor)  # noqa: S101
         # Complete remaining futures before restart
         remaining_futures = list(self.futures.keys())
         if remaining_futures:
@@ -441,7 +432,7 @@ class BatchProcessor:
         self.futures = {}
 
         # Update worker statuses
-        assert isinstance(self.max_workers, int)
+        assert isinstance(self.max_workers, int)  # noqa: S101
         for worker_id in range(self.max_workers):
             self.display.set_worker_status(worker_id, "restarted")
         self.display.refresh_display()
@@ -449,7 +440,7 @@ class BatchProcessor:
 
     def _complete_remaining_futures(self, remaining_futures):
         """Complete all remaining futures before worker restart."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
         for future in as_completed(remaining_futures):
             if future in self.futures:
                 worker_id, batch = self.futures.pop(future)
@@ -460,9 +451,7 @@ class BatchProcessor:
                     self.processed += len(batch)
                     self.errors += result["errors"]
                     self.error_data.extend(result["error_data"])
-                    self.display.set_worker_status(
-                        worker_id, "completed before restart"
-                    )
+                    self.display.set_worker_status(worker_id, "completed before restart")
                 except Exception as e:
                     for file in batch:
                         self.error_data.append({"file": file, "error": e})
@@ -481,7 +470,7 @@ class BatchProcessor:
 
     def _update_display(self):
         """Update the progress display."""
-        assert isinstance(self.display, ProgressDisplay)
+        assert isinstance(self.display, ProgressDisplay)  # noqa: S101
         self.display.update_progress(
             completed=self.processed,
             errors=self.errors,
@@ -503,15 +492,17 @@ class LogCollector:
         self.logs = []
 
     def handle(self, record):
-        self.logs.append({
-            "level": record.levelno,
-            "levelname": record.levelname,
-            "message": record.getMessage(),
-            "name": record.name,
-            "timestamp": record.created,
-            "pathname": getattr(record, "pathname", ""),
-            "lineno": getattr(record, "lineno", 0),
-        })
+        self.logs.append(
+            {
+                "level": record.levelno,
+                "levelname": record.levelname,
+                "message": record.getMessage(),
+                "name": record.name,
+                "timestamp": record.created,
+                "pathname": getattr(record, "pathname", ""),
+                "lineno": getattr(record, "lineno", 0),
+            }
+        )
 
 
 class WorkerLogHandler(logging.Handler):

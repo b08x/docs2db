@@ -4,8 +4,11 @@ import json
 import logging
 import os
 import time
-from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+
+from abc import ABC
+from abc import abstractmethod
+from datetime import datetime
+from datetime import UTC
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -13,6 +16,7 @@ from typing import Any
 import httpx
 import psutil
 import structlog
+
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.types.doc.document import DoclingDocument
@@ -20,13 +24,14 @@ from transformers import AutoTokenizer
 from transformers.utils import logging as transformers_logging
 
 from docs2db.config import settings
-from docs2db.const import (
-    CHUNKING_CONFIG,
-    CHUNKING_SCHEMA_VERSION,
-    DATABASE_SCHEMA_VERSION,
-)
-from docs2db.multiproc import BatchProcessor, setup_worker_logging
-from docs2db.utils import ensure_model_available, hash_file
+from docs2db.const import CHUNKING_CONFIG
+from docs2db.const import CHUNKING_SCHEMA_VERSION
+from docs2db.const import DATABASE_SCHEMA_VERSION
+from docs2db.multiproc import BatchProcessor
+from docs2db.multiproc import setup_worker_logging
+from docs2db.utils import ensure_model_available
+from docs2db.utils import hash_file
+
 
 logger = structlog.get_logger(__name__)
 
@@ -90,10 +95,7 @@ def is_chunks_stale(chunks_file: Path, source_file: Path) -> bool:
             return True
 
         stored_params = metadata["processing"]["parameters"]
-        if stored_params != CURRENT_METADATA:
-            return True
-
-        return False
+        return stored_params != CURRENT_METADATA
 
     except (json.JSONDecodeError, KeyError, ValueError, FileNotFoundError):
         return True
@@ -276,7 +278,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
 {text}
 
-Summary:"""
+Summary:"""  # noqa: E501
 
         # Log what we're about to send
         word_count = len(prompt.split())
@@ -316,7 +318,7 @@ Summary:"""
             },
             {
                 "role": "user",
-                "content": f"I will give you a document, then ask you to provide context for specific chunks from it.\n\n<document>\n{doc_text}\n</document>",
+                "content": f"I will give you a document, then ask you to provide context for specific chunks from it.\n\n<document>\n{doc_text}\n</document>",  # noqa: E501
             },
             {
                 "role": "assistant",
@@ -342,13 +344,9 @@ class WatsonXProvider(LLMProvider):
             model: Model identifier
         """
         try:
-            from ibm_watsonx_ai import (  # type: ignore[import-untyped]
-                APIClient,
-                Credentials,
-            )
-            from ibm_watsonx_ai.foundation_models import (  # type: ignore[import-untyped]
-                ModelInference,
-            )
+            from ibm_watsonx_ai import APIClient  # type: ignore[import-untyped]
+            from ibm_watsonx_ai import Credentials  # type: ignore[import-untyped]
+            from ibm_watsonx_ai.foundation_models import ModelInference  # type: ignore[import-untyped]
         except ImportError as e:
             raise ImportError(
                 "IBM WatsonX AI SDK is required for WatsonX provider. "
@@ -379,7 +377,7 @@ class WatsonXProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": f"I will give you a document, then ask you to provide context for a specific chunk from it.\n\n<document>\n{self.doc_text}\n</document>",
+                "content": f"I will give you a document, then ask you to provide context for a specific chunk from it.\n\n<document>\n{self.doc_text}\n</document>",  # noqa: E501
             },
             {
                 "role": "assistant",
@@ -405,7 +403,7 @@ class WatsonXProvider(LLMProvider):
 
 {text}
 
-Summary:"""
+Summary:"""  # noqa: E501
 
         messages = [
             {
@@ -446,9 +444,7 @@ Summary:"""
         pass
 
 
-def map_reduce_summarize(
-    provider: LLMProvider, text: str, max_tokens: int, model: str
-) -> str:
+def map_reduce_summarize(provider: LLMProvider, text: str, max_tokens: int, model: str) -> str:
     """Summarize large text using map-reduce approach.
 
     Args:
@@ -460,10 +456,7 @@ def map_reduce_summarize(
     Returns:
         str: Summarized text that fits within context limit
     """
-    logger.info(
-        f"Document too large for model context window. "
-        f"Starting map-reduce summarization (model: {model})"
-    )
+    logger.info(f"Document too large for model context window. Starting map-reduce summarization (model: {model})")
 
     # Reserve tokens for prompt overhead and response
     # Summarization prompt adds ~100 tokens, response uses 500 tokens
@@ -471,25 +464,18 @@ def map_reduce_summarize(
     chunk_size = max_tokens - PROMPT_OVERHEAD
 
     if chunk_size <= 0:
-        raise ValueError(
-            f"max_tokens ({max_tokens}) too small to allow for prompt overhead"
-        )
+        raise ValueError(f"max_tokens ({max_tokens}) too small to allow for prompt overhead")
 
     # Split text into chunks, accounting for prompt overhead
     chunks = split_text_into_chunks(text, chunk_size)
-    logger.info(
-        f"Split document into {len(chunks)} chunks for summarization (chunk_size: {chunk_size} tokens)"
-    )
+    logger.info(f"Split document into {len(chunks)} chunks for summarization (chunk_size: {chunk_size} tokens)")
 
     # Map: Summarize each chunk
     summaries = []
     for i, chunk in enumerate(chunks, 1):
         chunk_words = len(chunk.split())
         chunk_tokens = estimate_tokens(chunk)
-        logger.info(
-            f"Summarizing chunk {i}/{len(chunks)}: "
-            f"{chunk_words} words, {chunk_tokens} estimated tokens"
-        )
+        logger.info(f"Summarizing chunk {i}/{len(chunks)}: {chunk_words} words, {chunk_tokens} estimated tokens")
         summary = provider.summarize_text(chunk)
         summaries.append(summary)
 
@@ -549,18 +535,13 @@ class LLMSession:
         if provider == "watsonx":
             # Use WatsonX provider
             if not self.watsonx_url:
-                raise ValueError(
-                    "provider is 'watsonx' but watsonx_url is None. "
-                    "WatsonX API URL is required."
-                )
+                raise ValueError("provider is 'watsonx' but watsonx_url is None. WatsonX API URL is required.")
 
             api_key = settings.watsonx_api_key
             project_id = settings.watsonx_project_id
 
             if not api_key or not project_id:
-                raise ValueError(
-                    "WATSONX_API_KEY and WATSONX_PROJECT_ID must be set (via env vars or .env file)"
-                )
+                raise ValueError("WATSONX_API_KEY and WATSONX_PROJECT_ID must be set (via env vars or .env file)")
 
             self.provider = WatsonXProvider(
                 api_key=api_key,
@@ -581,10 +562,7 @@ class LLMSession:
                 model=self.model,
             )
         else:
-            raise ValueError(
-                f"Unknown provider: '{provider}'. "
-                "Valid options are 'openai' or 'watsonx'."
-            )
+            raise ValueError(f"Unknown provider: '{provider}'. Valid options are 'openai' or 'watsonx'.")
 
     def set_document(self, doc_text: str):
         """Set the document that will be used for context generation.
@@ -601,10 +579,7 @@ class LLMSession:
         doc_chars = len(doc_text)
 
         # Determine model limits
-        if self.context_limit_override:
-            model_limit = self.context_limit_override
-        else:
-            model_limit = MODEL_CONTEXT_LIMITS.get(self.model, 32768)
+        model_limit = self.context_limit_override or MODEL_CONTEXT_LIMITS.get(self.model, 32768)
         usable_limit = int(model_limit * CONTEXT_SAFETY_MARGIN)
 
         logger.debug(
@@ -615,16 +590,11 @@ class LLMSession:
         # Check if summarization is needed
         if doc_tokens > usable_limit:
             logger.info(
-                f"Document exceeds context limit ({doc_tokens} > {usable_limit}). "
-                f"Using map-reduce summarization."
+                f"Document exceeds context limit ({doc_tokens} > {usable_limit}). Using map-reduce summarization."
             )
-            doc_text = map_reduce_summarize(
-                self.provider, doc_text, usable_limit, self.model
-            )
+            doc_text = map_reduce_summarize(self.provider, doc_text, usable_limit, self.model)
             final_tokens = estimate_tokens(doc_text)
-            logger.info(
-                f"Summarization complete. Reduced from {doc_tokens} to {final_tokens} tokens"
-            )
+            logger.info(f"Summarization complete. Reduced from {doc_tokens} to {final_tokens} tokens")
             self._was_summarized = True
 
         # Update provider with (potentially summarized) document
@@ -638,7 +608,7 @@ class LLMSession:
 {chunk_text}
 </chunk>
 
-Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
+Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""  # noqa: E501
 
         return self.provider.get_chunk_context(chunk_prompt)
 
@@ -681,9 +651,7 @@ def generate_chunks_for_document(
     if not force and not is_chunks_stale(chunks_file, source_file):
         return chunks_file
 
-    dl_doc = DoclingDocument.model_validate_json(
-        json_data=source_file.read_text().encode("utf-8")
-    )
+    dl_doc = DoclingDocument.model_validate_json(json_data=source_file.read_text().encode("utf-8"))
 
     # Create chunker and chunk document
     chunker = HybridChunker(tokenizer=get_tokenizer(), merge_peers=True)
@@ -691,7 +659,7 @@ def generate_chunks_for_document(
 
     # Reuse LLM session if context generation is enabled
     if not skip_context:
-        assert llm_session is not None
+        assert llm_session is not None  # noqa: S101
         doc_text = dl_doc.export_to_markdown()
         llm_session.set_document(doc_text)
 
@@ -745,11 +713,7 @@ def generate_chunks_for_document(
             enrichment_metadata["endpoint"] = "http://localhost:11434"
 
         # Only include document_summarized if it actually happened
-        if (
-            llm_session
-            and hasattr(llm_session, "_was_summarized")
-            and llm_session._was_summarized
-        ):
+        if llm_session and hasattr(llm_session, "_was_summarized") and llm_session._was_summarized:
             enrichment_metadata["document_summarized"] = True
 
         # Only include context_limit_override if it was set
@@ -765,7 +729,7 @@ def generate_chunks_for_document(
             "database_schema_version": DATABASE_SCHEMA_VERSION,
             "chunking_schema_version": CHUNKING_SCHEMA_VERSION,
             "processing": processing_metadata,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "chunk_count": len(chunks_data),
         },
         "chunks": chunks_data,
@@ -896,9 +860,7 @@ def generate_chunks_batch(
                     "worker_logs": log_collector.logs,
                 }
         else:
-            logger.debug(
-                "All files in batch already processed, skipping LLM session creation"
-            )
+            logger.debug("All files in batch already processed, skipping LLM session creation")
 
     try:
         for file in source_files:
@@ -923,9 +885,9 @@ def generate_chunks_batch(
     finally:
         # Clean up the reusable session
         if reusable_llm_session:
-            try:
+            try:  # noqa: SIM105
                 reusable_llm_session.close()
-            except Exception:
+            except Exception:  # noqa: S110
                 pass  # Don't mask exceptions from try block
 
     # Report worker memory footprint.
@@ -968,7 +930,8 @@ def generate_chunks(
         provider: LLM provider ("openai" or "watsonx"); inferred from URLs or defaults to settings.llm_provider.
         openai_url: OpenAI-compatible API URL (defaults to settings.llm_openai_url).
         watsonx_url: WatsonX API URL (defaults to settings.llm_watsonx_url).
-        context_limit_override: Override model context limit in tokens (defaults to settings.llm_context_limit_override).
+        context_limit_override: Override model context limit in tokens
+            (defaults to settings.llm_context_limit_override).
 
     Returns:
         bool: True if successful, False if any errors occurred.

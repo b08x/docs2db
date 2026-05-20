@@ -2,13 +2,17 @@
 
 import json
 import warnings
-from datetime import datetime, timezone
+
+from datetime import datetime
+from datetime import UTC
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
-from docs2db.utils import ensure_model_available, hash_file
+from docs2db.utils import ensure_model_available
+from docs2db.utils import hash_file
+
 
 logger = structlog.get_logger(__name__)
 
@@ -50,10 +54,7 @@ def is_embedding_stale(
         # Check if model or dimensions have changed
         if metadata.get("model") != model:
             return True
-        if metadata.get("dimensions") != dimensions:
-            return True
-
-        return False
+        return metadata.get("dimensions") != dimensions
 
     except (json.JSONDecodeError, KeyError, ValueError, FileNotFoundError):
         return True
@@ -111,7 +112,7 @@ class Embedding:
         self.device = get_optimal_device()
 
         if self.device == "cpu":
-            logger.warning(f"Using CPU to generate embeddings. May be slow.")
+            logger.warning("Using CPU to generate embeddings. May be slow.")
 
         # Lazy-loaded provider
         self._provider = None
@@ -141,18 +142,14 @@ class Embedding:
         if self._provider is None:
             # Suppress transformers warnings when creating providers
             warnings.filterwarnings("ignore", category=FutureWarning, module="torch")
-            warnings.filterwarnings(
-                "ignore", category=FutureWarning, module="transformers"
-            )
+            warnings.filterwarnings("ignore", category=FutureWarning, module="transformers")
             warnings.filterwarnings(
                 "ignore",
                 message=".*encoder_attention_mask.*is deprecated.*",
                 category=FutureWarning,
             )
 
-            self._provider = self.provider_cls(
-                self.model, self.dimensions, self.batch_size, self.device
-            )
+            self._provider = self.provider_cls(self.model, self.dimensions, self.batch_size, self.device)
 
         return self._provider
 
@@ -165,7 +162,7 @@ class Embedding:
             self.dimensions,
         )
 
-    def _load_chunks(self, chunks_file: Path) -> Tuple[List[str], Dict[str, Any]]:
+    def _load_chunks(self, chunks_file: Path) -> tuple[list[str], dict[str, Any]]:
         """Load chunks from a .chunks.json file."""
         try:
             with open(chunks_file) as f:
@@ -184,9 +181,9 @@ class Embedding:
     def _save_embeddings_file(
         self,
         file: Path,
-        embeddings: List[List[float]],
-        chunks: List[str],
-        source_metadata: Dict[str, Any],
+        embeddings: list[list[float]],
+        chunks: list[str],
+        source_metadata: dict[str, Any],
         chunks_file: Path,
     ) -> None:
         """Save embeddings to file with metadata."""
@@ -200,7 +197,7 @@ class Embedding:
                     "chunks_hash": chunks_hash,
                     "model": self.model,
                     "dimensions": self.dimensions,
-                    "embedded_at": datetime.now(timezone.utc).isoformat(),
+                    "embedded_at": datetime.now(UTC).isoformat(),
                     "count": len(embeddings),
                     "chunks": {
                         "chunk_count": len(chunks),
@@ -219,9 +216,7 @@ class Embedding:
                 file.unlink()
             raise
 
-    def generate_embedding(
-        self, chunks_file: str | Path, force: bool = False
-    ) -> Optional[Path]:
+    def generate_embedding(self, chunks_file: str | Path, force: bool = False) -> Path | None:
         """Generate embeddings for a chunks file - handles everything!"""
         chunks_file = Path(chunks_file)
         embeddings_file = create_embedding_filename(chunks_file, self.model)
@@ -238,9 +233,7 @@ class Embedding:
         provider = self._get_provider()
         embeddings = provider.generate_embeddings(chunks)
 
-        self._save_embeddings_file(
-            embeddings_file, embeddings, chunks, source_metadata, chunks_file
-        )
+        self._save_embeddings_file(embeddings_file, embeddings, chunks, source_metadata, chunks_file)
 
         return embeddings_file
 
@@ -262,7 +255,7 @@ class EmbeddingProvider:
         self.batch_size = batch_size
         self.device = device
 
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for a list of texts."""
         raise NotImplementedError
 
@@ -279,23 +272,18 @@ class GraniteEmbeddingProvider(EmbeddingProvider):
         """Get or create the Granite model and tokenizer."""
         if self._model is None or self._tokenizer is None:
             try:
-                from transformers import AutoModel, AutoTokenizer
+                from transformers import AutoModel
+                from transformers import AutoTokenizer
 
                 # Set MPS memory limits to prevent memory leaks
                 if self.device == "mps":
                     import torch
 
-                    torch.mps.set_per_process_memory_fraction(
-                        0.4
-                    )  # Limit to 40% of memory per worker
+                    torch.mps.set_per_process_memory_fraction(0.4)  # Limit to 40% of memory per worker
 
                 try:
-                    self._model = AutoModel.from_pretrained(
-                        self.model, local_files_only=True
-                    )
-                    self._tokenizer = AutoTokenizer.from_pretrained(
-                        self.model, local_files_only=True
-                    )
+                    self._model = AutoModel.from_pretrained(self.model, local_files_only=True)
+                    self._tokenizer = AutoTokenizer.from_pretrained(self.model, local_files_only=True)
                 except Exception as e:
                     raise ValueError(
                         f"Granite model '{self.model}' not found locally. "
@@ -313,7 +301,7 @@ class GraniteEmbeddingProvider(EmbeddingProvider):
                 ) from None
         return self._model, self._tokenizer
 
-    def _get_embedding_batch(self, texts: List[str]) -> List[List[float]]:
+    def _get_embedding_batch(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings for a batch of texts using CLS token pooling."""
         import gc
 
@@ -361,7 +349,7 @@ class GraniteEmbeddingProvider(EmbeddingProvider):
 
         return result
 
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using Granite model with CLS pooling."""
         # Process in batches
         all_embeddings = []
@@ -376,7 +364,7 @@ class GraniteEmbeddingProvider(EmbeddingProvider):
 class WatsonEmbeddingProvider(EmbeddingProvider):
     """Watson embedding provider - placeholder for now."""
 
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using Watson."""
         # TODO: Implement based on existing WatsonEmbeddingProvider
         raise NotImplementedError("Watson provider implementation needed")
@@ -385,18 +373,16 @@ class WatsonEmbeddingProvider(EmbeddingProvider):
 class SentenceTransformerProvider(EmbeddingProvider):
     """Sentence Transformers provider - placeholder for now."""
 
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using Sentence Transformers."""
         # TODO: Implement based on existing SentenceTransformerProvider
-        raise NotImplementedError(
-            "Sentence Transformers provider implementation needed"
-        )
+        raise NotImplementedError("Sentence Transformers provider implementation needed")
 
 
 class NoInstructEmbeddingProvider(EmbeddingProvider):
     """NoInstruct embedding provider - placeholder for now."""
 
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using NoInstruct model."""
         # TODO: Implement based on existing NoInstructEmbeddingProvider
         raise NotImplementedError("NoInstruct provider implementation needed")
@@ -405,7 +391,7 @@ class NoInstructEmbeddingProvider(EmbeddingProvider):
 class E5EmbeddingProvider(EmbeddingProvider):
     """E5 embedding provider - placeholder for now."""
 
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using E5 model."""
         # TODO: Implement based on existing E5EmbeddingProvider
         raise NotImplementedError("E5 provider implementation needed")
