@@ -27,6 +27,7 @@ from docs2db.config import settings
 from docs2db.const import CHUNKING_CONFIG
 from docs2db.const import CHUNKING_SCHEMA_VERSION
 from docs2db.const import DATABASE_SCHEMA_VERSION
+from docs2db.exceptions import ConfigurationError
 from docs2db.multiproc import BatchProcessor
 from docs2db.multiproc import setup_worker_logging
 from docs2db.utils import ensure_model_available
@@ -659,7 +660,8 @@ def generate_chunks_for_document(
 
     # Reuse LLM session if context generation is enabled
     if not skip_context:
-        assert llm_session is not None  # noqa: S101
+        if llm_session is None:
+            raise ConfigurationError("LLM session is None")
         doc_text = dl_doc.export_to_markdown()
         llm_session.set_document(doc_text)
 
