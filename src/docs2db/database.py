@@ -774,43 +774,47 @@ class DatabaseManager:
             embedding_data,
             embedding_file,
         ) in files_data:
-            # Load chunks data
-            with open(chunks_file, encoding="utf-8") as f:
-                chunks_json = json.load(f)
+            try:
+                # Load chunks data
+                with open(chunks_file, encoding="utf-8") as f:
+                    chunks_json = json.load(f)
 
-            chunks = chunks_json.get("chunks", [])
-            embedding_vectors = embedding_data.get("embeddings", [])
+                chunks = chunks_json.get("chunks", [])
+                embedding_vectors = embedding_data.get("embeddings", [])
 
-            if len(chunks) != len(embedding_vectors):
-                logger.error(
-                    "Chunks count (%s) != embeddings count (%s) for %s",
-                    len(chunks),
-                    len(embedding_vectors),
+                if len(chunks) != len(embedding_vectors):
+                    logger.error(
+                        "Chunks count (%s) != embeddings count (%s) for %s",
+                        len(chunks),
+                        len(embedding_vectors),
+                        source_file.name,
+                    )
+                    errors += 1
+                    continue
+
+                stats = source_file.stat()
+
+                doc_data = (
+                    str(source_file.relative_to(content_dir)),
                     source_file.name,
+                    self._get_content_type(source_file),
+                    stats.st_size,
+                    self._convert_timestamp(stats.st_mtime),
+                    str(chunks_file),
                 )
+                documents_data.append(
+                    (
+                        source_file,
+                        doc_data,
+                        chunks,
+                        embedding_vectors,
+                        model_id,
+                        embedding_file,
+                    )
+                )
+            except (OSError, json.JSONDecodeError) as e:
+                logger.error("Failed to prepare %s: %s", source_file.name, e)
                 errors += 1
-                continue
-
-            stats = source_file.stat()
-
-            doc_data = (
-                str(source_file.relative_to(content_dir)),
-                source_file.name,
-                self._get_content_type(source_file),
-                stats.st_size,
-                self._convert_timestamp(stats.st_mtime),
-                str(chunks_file),
-            )
-            documents_data.append(
-                (
-                    source_file,
-                    doc_data,
-                    chunks,
-                    embedding_vectors,
-                    model_id,
-                    embedding_file,
-                )
-            )
 
         if not documents_data:
             return 0, errors
