@@ -1,10 +1,23 @@
-.PHONY: test test-ci db-up-test db-down-test db-destroy-test test-with-db list
+.PHONY: test test-ci lint format typecheck db-up-test db-down-test db-destroy-test clean list
 
 test:
 	uv run pytest
 
 test-ci:
 	uv run pytest -m "not no_ci"
+
+lint:
+	uv run ruff check --fix src/ tests/
+	uv run pyright src/docs2db/
+
+format:
+	uv run ruff format src/ tests/
+
+typecheck:
+	uv run pyright src/docs2db/
+
+clean:
+	rm -rf .pytest_cache .ruff_cache htmlcov .coverage
 
 # Test database targets (separate from production database)
 # Uses --profile test, different port (5433), and separate volumes
@@ -31,8 +44,10 @@ list:
 	@echo "  db-destroy-test - Stop test database and remove volumes"
 	@echo ""
 	@echo "Linting & Formatting:"
-	@echo "  pre-commit run --all-files  - Run all checks (ruff, pyright, etc.)"
-	@echo "  pre-commit run              - Run checks on staged files only"
+	@echo "  lint            - Run ruff check + pyright"
+	@echo "  format          - Format code with ruff"
+	@echo "  typecheck       - Run pyright type checker"
+	@echo "  clean           - Remove generated files"
 	@echo ""
 	@echo "CLI Commands (use these for development):"
 	@echo "  docs2db pipeline <path>     - Complete workflow"
