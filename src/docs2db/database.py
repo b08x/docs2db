@@ -78,10 +78,15 @@ def get_db_config() -> dict[str, str]:
     # Try postgres-compose.yml in current working directory
     compose_file = Path.cwd() / "postgres-compose.yml"
     if compose_file.exists():
-        try:
-            with open(compose_file) as f:
+        with open(compose_file) as f:
+            try:
                 compose_data = yaml.safe_load(f)
+            except yaml.YAMLError:
+                compose_data = None
 
+        if compose_data is None:
+            logger.warning("postgres-compose.yml exists but does not contain valid YAML")
+        else:
             db_service = compose_data.get("services", {}).get("db", {})
             env = db_service.get("environment", {})
 
@@ -99,54 +104,44 @@ def get_db_config() -> dict[str, str]:
                     host_port = port_mapping.split(":")[0]
                     config["port"] = host_port
                     break
-        except Exception as e:
-            # If compose file exists but can't be parsed, warn but continue with defaults
-            logger.warning(f"Could not parse postgres-compose.yml: {e}")
 
     # DATABASE_URL takes precedence over compose file but not over individual vars
     if has_database_url:
         database_url = os.getenv("DATABASE_URL", "")
-        try:
-            # Parse postgresql://user:password@host:port/database
-            # Support both postgresql:// and postgres:// schemes
-            if database_url.startswith(("postgresql://", "postgres://")):
-                # Remove scheme
-                url_without_scheme = database_url.split("://", 1)[1]
+        # Parse postgresql://user:password@host:port/database
+        # Support both postgresql:// and postgres:// schemes
+        if database_url.startswith(("postgresql://", "postgres://")):
+            # Remove scheme
+            url_without_scheme = database_url.split("://", 1)[1]
 
-                # Split into credentials@location and database
-                if "@" in url_without_scheme:
-                    credentials, location = url_without_scheme.split("@", 1)
+            # Split into credentials@location and database
+            if "@" in url_without_scheme:
+                credentials, location = url_without_scheme.split("@", 1)
 
-                    # Parse credentials
-                    if ":" in credentials:
-                        config["user"], config["password"] = credentials.split(":", 1)
-                    else:
-                        config["user"] = credentials
-
-                    # Parse location and database
-                    if "/" in location:
-                        host_port, config["database"] = location.split("/", 1)
-                    else:
-                        host_port = location
-
-                    # Parse host and port
-                    if ":" in host_port:
-                        config["host"], config["port"] = host_port.split(":", 1)
-                    else:
-                        config["host"] = host_port
+                # Parse credentials
+                if ":" in credentials:
+                    config["user"], config["password"] = credentials.split(":", 1)
                 else:
-                    raise ConfigurationError(f"Invalid DATABASE_URL format (missing @): {database_url}")
+                    config["user"] = credentials
+
+                # Parse location and database
+                if "/" in location:
+                    host_port, config["database"] = location.split("/", 1)
+                else:
+                    host_port = location
+
+                # Parse host and port
+                if ":" in host_port:
+                    config["host"], config["port"] = host_port.split(":", 1)
+                else:
+                    config["host"] = host_port
             else:
-                raise ConfigurationError(
-                    f"Invalid DATABASE_URL scheme. Expected postgresql:// or postgres://, "
-                    f"got: {database_url.split('://')[0] if '://' in database_url else database_url}"
-                )
-        except ConfigurationError:
-            raise
-        except Exception as e:
+                raise ConfigurationError(f"Invalid DATABASE_URL format (missing @): {database_url}")
+        else:
             raise ConfigurationError(
-                f"Failed to parse DATABASE_URL: {e}. Expected format: postgresql://user:password@host:port/database"
-            ) from e
+                f"Invalid DATABASE_URL scheme. Expected postgresql:// or postgres://, "
+                f"got: {database_url.split('://')[0] if '://' in database_url else database_url}"
+            )
 
     # Individual environment variables override everything (highest precedence)
     if os.getenv("POSTGRES_HOST"):
@@ -716,6 +711,10 @@ class DatabaseManager:
                 if row is None:
                     return None
 
+                if len(row) < 7:
+                    logger.error("RAG settings row has unexpected shape: expected 7 columns, got %s", len(row))
+                    return None
+
                 return {
                     "refinement_prompt": row[0],
                     "enable_refinement": row[1],
@@ -725,7 +724,7 @@ class DatabaseManager:
                     "max_tokens_in_context": row[5],
                     "refinement_questions_count": row[6],
                 }
-            except Exception as e:
+            except psycopg.Error as e:
                 logger.warning(f"Could not retrieve RAG settings: {e}")
                 return None
 
@@ -785,8 +784,10 @@ class DatabaseManager:
 
                 if len(chunks) != len(embedding_vectors):
                     logger.error(
-                        f"Chunks count ({len(chunks)}) != embeddings count "
-                        f"({len(embedding_vectors)}) for {source_file.name}"
+                        "Chunks count (%s) != embeddings count (%s) for %s",
+                        len(chunks),
+                        len(embedding_vectors),
+                        source_file.name,
                     )
                     errors += 1
                     continue
@@ -811,9 +812,8 @@ class DatabaseManager:
                         embedding_file,
                     )
                 )
-
             except Exception as e:
-                logger.error(f"Failed to prepare {source_file.name}: {e}")
+                logger.error("Failed to prepare %s: %s", source_file.name, e)
                 errors += 1
 
         if not documents_data:
@@ -916,7 +916,7 @@ class DatabaseManager:
                         conn.execute(SQL("RELEASE SAVEPOINT {}").format(Identifier(f"sp_doc_{idx}")))
                         processed += 1
 
-                    except Exception as e:
+                    except psycopg.Error as e:
                         conn.execute(SQL("ROLLBACK TO SAVEPOINT {}").format(Identifier(f"sp_doc_{idx}")))
                         logger.error(f"Failed to process document {source_file.name}: {e}")
                         errors += 1
@@ -960,7 +960,7 @@ class DatabaseManager:
                         embeddings_data.append(embedding_data_tuple)
                         conn.execute(SQL("RELEASE SAVEPOINT {}").format(Identifier(f"sp_chunk_{idx}")))
 
-                    except Exception as e:
+                    except psycopg.Error as e:
                         conn.execute(SQL("ROLLBACK TO SAVEPOINT {}").format(Identifier(f"sp_chunk_{idx}")))
                         logger.error(f"Failed to insert chunk for {source_file}: {e}")
                         errors += 1
@@ -980,7 +980,7 @@ class DatabaseManager:
                             embedding_tuple,
                         )
                         conn.execute(SQL("RELEASE SAVEPOINT {}").format(Identifier(f"sp_emb_{idx}")))
-                    except Exception as e:
+                    except psycopg.Error as e:
                         conn.execute(SQL("ROLLBACK TO SAVEPOINT {}").format(Identifier(f"sp_emb_{idx}")))
                         logger.error(f"Failed to insert embedding: {e}")
                         errors += 1
@@ -988,7 +988,7 @@ class DatabaseManager:
                 # Commit the entire batch
                 conn.commit()
 
-            except Exception as e:
+            except psycopg.Error as e:
                 conn.rollback()
                 logger.error(f"Batch transaction failed: {e}")
                 errors += len(documents_data)
@@ -1153,7 +1153,7 @@ def check_database_status(
                 _pg_version, _current_time = row
                 logger.info("Database connection successful")
 
-    except Exception as conn_error:
+    except psycopg.Error as conn_error:
         # Handle server connectivity errors
         error_msg = str(conn_error).lower()
         if (
@@ -1181,7 +1181,7 @@ def check_database_status(
         with db_manager.get_direct_connection() as conn:
             # Test that we can actually query the target database
             conn.execute("SELECT 1")
-    except Exception as conn_error:
+    except psycopg.Error as conn_error:
         # If we get here, PostgreSQL is running but our target database doesn't exist
         logger.error("Database does not exist. Create database or check name")
         raise DatabaseError("Database does not exist") from conn_error
@@ -1268,8 +1268,7 @@ def check_database_status(
                     f"  Last modified  : "
                     f"{metadata['last_modified_at'].strftime('%Y-%m-%d %H:%M') if metadata['last_modified_at'] else 'Unknown'}"  # noqa: E501
                 )
-        except Exception:  # noqa: S110
-            # Schema metadata table doesn't exist yet
+        except psycopg.errors.UndefinedTable:
             pass
 
     # Display recent schema changes (last 5)
@@ -1306,8 +1305,7 @@ def check_database_status(
                 logger.info("\nRecent Changes (last 5):")
                 for change_data in changes:
                     logger.info(db_manager.format_schema_change_display(change_data))
-        except Exception:  # noqa: S110
-            # Schema changes table doesn't exist yet
+        except psycopg.errors.UndefinedTable:
             pass
 
     if stats["documents"] > 0:
@@ -1427,7 +1425,7 @@ def _ensure_database_exists(host: str, port: int, db: str, user: str, password: 
                 conn.execute(create_db_query)
                 logger.info(f"Database '{db}' created successfully")
 
-    except Exception as e:
+    except psycopg.Error as e:
         logger.error(f"Failed to ensure database exists: {e}")
         raise DatabaseError(f"Could not create database '{db}': {e}") from e
 

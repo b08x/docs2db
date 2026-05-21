@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `test_database_functions_interface` — removed vacuous assertion (check_database_status returns None by contract)
 
 ### Changed
+- Added `lint`, `format`, `typecheck`, and `clean` targets to Makefile
+- Narrowed broad `except Exception` clauses in `database.py` to specific types (`psycopg.Error`, `psycopg.errors.UndefinedTable`, `yaml.YAMLError`) and removed unnecessary try/except blocks
 - Replaced `subprocess.run()` CLI integration tests with Typer `CliRunner` for in-process invocation — faster execution, no S603/S607 suppressions needed
 - Converted database layer from async psycopg (`AsyncConnection`) to sync psycopg (`Connection`), eliminating nested event loop issues with single-threaded batch processing
 - Removed `pytest-asyncio` and `greenlet` dev dependencies
