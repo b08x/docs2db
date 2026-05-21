@@ -712,7 +712,7 @@ class DatabaseManager:
                     return None
 
                 if len(row) < 7:
-                    logger.error(f"RAG settings row has unexpected shape: expected 7 columns, got {len(row)}")
+                    logger.error("RAG settings row has unexpected shape: expected 7 columns, got %s", len(row))
                     return None
 
                 return {
@@ -783,8 +783,10 @@ class DatabaseManager:
 
             if len(chunks) != len(embedding_vectors):
                 logger.error(
-                    f"Chunks count ({len(chunks)}) != embeddings count "
-                    f"({len(embedding_vectors)}) for {source_file.name}"
+                    "Chunks count (%s) != embeddings count (%s) for %s",
+                    len(chunks),
+                    len(embedding_vectors),
+                    source_file.name,
                 )
                 errors += 1
                 continue
