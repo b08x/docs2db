@@ -812,7 +812,7 @@ class DatabaseManager:
                         embedding_file,
                     )
                 )
-            except (OSError, json.JSONDecodeError) as e:
+            except Exception as e:
                 logger.error("Failed to prepare %s: %s", source_file.name, e)
                 errors += 1
 
