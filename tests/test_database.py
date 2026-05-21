@@ -410,7 +410,7 @@ class TestDatabaseSQL:
                         and params
                         and "bad_doc" in str(params[0])
                     ):
-                        raise RuntimeError("Simulated DB failure for savepoint isolation test")
+                        raise psycopg.DatabaseError("Simulated DB failure for savepoint isolation test")
                     return self._conn.execute(sql, params, *args, **kwargs)
 
                 def commit(self):
