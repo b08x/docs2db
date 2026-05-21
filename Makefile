@@ -1,4 +1,14 @@
-.PHONY: test test-ci lint db-up-test db-down-test db-destroy-test clean help
+.PHONY: help test test-ci lint db-up-test db-down-test db-destroy-test clean
+
+help:
+	@echo "Available targets:"
+	@echo "  test            - Run all tests"
+	@echo "  test-ci         - Run CI tests (excluding no_ci marked tests)"
+	@echo "  lint            - Run all pre-commit checks (ruff, pyright, etc.)"
+	@echo "  clean           - Remove generated files"
+	@echo "  db-up-test      - Start test database"
+	@echo "  db-down-test    - Stop test database"
+	@echo "  db-destroy-test - Stop test database and remove volumes"
 
 test:
 	uv run pytest
@@ -23,13 +33,3 @@ db-down-test:
 db-destroy-test:
 	$(MAKE) db-down-test
 	podman volume rm docs2db_test_pgdata || true
-
-help:
-	@echo "Available targets:"
-	@echo "  test            - Run all tests"
-	@echo "  test-ci         - Run CI tests (excluding no_ci marked tests)"
-	@echo "  lint            - Run all pre-commit checks (ruff, pyright, etc.)"
-	@echo "  clean           - Remove generated files"
-	@echo "  db-up-test      - Start test database"
-	@echo "  db-down-test    - Stop test database"
-	@echo "  db-destroy-test - Stop test database and remove volumes"
