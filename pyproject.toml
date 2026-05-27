@@ -48,7 +48,7 @@ dependencies = [
 
 [project.optional-dependencies]
 watsonx = [
-    "ibm-watsonx-ai>=1.5.11",
+    "ibm-watsonx-ai>=1.5.12",
 ]
 
 [project.scripts]

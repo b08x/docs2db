@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced `subprocess.run()` CLI integration tests with Typer `CliRunner` for in-process invocation — faster execution, no S603/S607 suppressions needed
 - Converted database layer from async psycopg (`AsyncConnection`) to sync psycopg (`Connection`), eliminating nested event loop issues with single-threaded batch processing
 - Removed `pytest-asyncio` and `greenlet` dev dependencies
+- Bumped `ibm-watsonx-ai` minimum version to `1.5.12`
+- Constrained Renovate to keep `typer` at `<0.22.0` while `docling-slim` pins it; prevents recurring broken update PRs (#33)
 
 ## [0.4.4] - 2026-03-16
 

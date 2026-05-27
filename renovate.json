@@ -26,6 +26,11 @@
       "enabled": false
     },
     {
+      "description": "Pin typer to docling's supported range (docling-slim depends on typer<0.22.0)",
+      "matchDepNames": ["typer"],
+      "allowedVersions": "<0.22.0"
+    },
+    {
       "description": "Batch and auto-merge safe non-major dependency updates",
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "groupName": "all non-major dependencies",
