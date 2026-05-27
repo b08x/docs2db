@@ -42,13 +42,13 @@ dependencies = [
     "torch>=2.7.1",
     "torchvision>=0.23.0",
     "tqdm>=4.67.3",
-    "typer>=0.15.0",
+    "typer>=0.25.1",
     "xxhash>=3.7.0",
 ]
 
 [project.optional-dependencies]
 watsonx = [
-    "ibm-watsonx-ai>=1.5.11",
+    "ibm-watsonx-ai>=1.5.12",
 ]
 
 [project.scripts]
